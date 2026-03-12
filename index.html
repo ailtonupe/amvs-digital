@@ -26,18 +26,28 @@
     // URL base do seu Web App no Apps Script
     const baseUrlAppsScript = "https://script.google.com/macros/s/AKfycbxBTCIRi8IjBt92IPFFAXG4HTcX5c9GF0eJjgfyry5ehA9tDgvscJelmk3ktfkHWuvJ/exec";
 
-    // 1. LÓGICA DE ENTRADA: Lê a URL do navegador e monta o iframe
+    // 1. LÓGICA DE INTERCEPTAÇÃO E CARREGAMENTO
     window.onload = function() {
-        // Pega o caminho após o domínio (ex: de "site.com/processos" pega "processos")
-        // O substring(1) remove a barra inicial "/"
-        let path = window.location.pathname.substring(1);
+        let path = "";
         
-        // Remove eventuais barras no final para limpar a string
-        path = path.replace(/\/$/, "");
+        // Verifica se viemos de um redirecionamento do 404.html
+        let redirect = sessionStorage.redirect;
+        delete sessionStorage.redirect; // Limpa a memória imediatamente após ler
 
+        if (redirect && redirect !== location.href) {
+            // Se viemos do 404, reescrevemos a URL na barra de endereços para a original (ex: /dashboard)
+            window.history.replaceState(null, null, redirect);
+            
+            // Extraímos a rota para passar pro Apps Script
+            let urlObj = new URL(redirect);
+            path = urlObj.pathname.substring(1).replace(/\/$/, "");
+        } else {
+            // Se o usuário entrou direto pela raiz (amvsdigital.com.br/)
+            path = window.location.pathname.substring(1).replace(/\/$/, "");
+        }
+
+        // Injeta a URL correta no iframe
         const iframe = document.getElementById('appFrame');
-
-        // Se o usuário digitou uma rota (ex: /dashboard), passa o parâmetro. Senão, carrega a raiz pura.
         if (path) {
             iframe.src = baseUrlAppsScript + "?page=" + path;
         } else {
@@ -45,17 +55,14 @@
         }
     };
 
-    // 2. LÓGICA DE NAVEGAÇÃO: Escuta o Apps Script para mudar a URL visualmente quando o usuário clica nos menus
+    // 2. COMUNICAÇÃO COM O APPS SCRIPT (Atualiza a URL enquanto o usuário navega)
     window.addEventListener('message', function(event) {
-        // Validação de segurança
         if (event.data && event.data.sistema === 'AMVS_DIGITAL' && event.data.acao === 'MUDAR_URL') {
-            
             const novoCaminho = '/' + event.data.caminho;
             
-            // Só altera se for diferente do atual para não bugar o histórico
             if (window.location.pathname !== novoCaminho) {
-                // Muda a URL no navegador do celular/PC sem recarregar a tela!
-                window.history.pushState({ path: novoCaminho }, "", novoCaminho);
+                // Atualiza a barra de endereço sem recarregar a tela
+                window.history.pushState(null, null, novoCaminho);
             }
         }
     });
