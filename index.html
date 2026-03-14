@@ -73,8 +73,23 @@
   window.OneSignalDeferred = window.OneSignalDeferred || [];
   OneSignalDeferred.push(async function(OneSignal) {
     await OneSignal.init({
-      appId: "d0db32c7-befc-419e-a2f2-0c2e1ca73959",
-    });
+  appId: "d0db32c7-befc-419e-a2f2-0c2e1ca73959",
+  promptOptions: {
+    slidedown: {
+      prompts: [
+        {
+          type: "push",
+          autoPrompt: true,
+          text: {
+            actionMessage: "Receba notificações sobre suas atividades e demandas do AMVS Digital.",
+            acceptButton: "Permitir",
+            cancelButton: "Agora não",
+          }
+        }
+      ]
+    }
+  }
+});
 
     // Função auxiliar para enviar o Player ID ao GAS
     async function enviarPlayerIdAoGAS(playerId) {
