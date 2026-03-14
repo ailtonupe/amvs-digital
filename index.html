@@ -60,25 +60,24 @@
     // ── Listener único (URL + login) ──────────────────
     window.addEventListener('message', function(event) {
 
-      // 1. Atualiza a URL ao navegar
-      if (event.data?.sistema === 'AMVS_DIGITAL' && event.data?.acao === 'MUDAR_URL') {
-        const novoCaminho = '/' + event.data.caminho;
-        if (window.location.pathname !== novoCaminho) {
-          window.history.pushState(null, null, novoCaminho);
-        }
-      }
+  // 1. Atualiza a URL ao navegar
+  if (event.data?.sistema === 'AMVS_DIGITAL' && event.data?.acao === 'MUDAR_URL') {
+    const novoCaminho = '/' + event.data.caminho;
+    if (window.location.pathname !== novoCaminho) {
+      window.history.pushState(null, null, novoCaminho);
+    }
 
-      // 2. Exibe prompt do OneSignal após login
-      if (event.data?.sistema === 'AMVS_DIGITAL' &&
-          event.data?.token   === 'amvs2026'    &&
-          event.data?.acao    === 'USUARIO_LOGADO') {
-        OneSignalDeferred.push(function(OneSignal) {
-          if (!OneSignal.User.PushSubscription.optedIn) {
-            OneSignal.Slidedown.promptPush();
-          }
-        });
-      }
-    });
+    // 2. Se mudou para qualquer rota autenticada (não é login), considera logado
+    const rotasAutenticadas = ['busca', 'dashboard', 'processos', 'atividades'];
+    if (rotasAutenticadas.includes(event.data.caminho)) {
+      OneSignalDeferred.push(function(OneSignal) {
+        if (!OneSignal.User.PushSubscription.optedIn) {
+          OneSignal.Slidedown.promptPush();
+        }
+      });
+    }
+  }
+});
 
     // ── Carregamento do iframe ────────────────────────
     window.onload = function() {
