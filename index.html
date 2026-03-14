@@ -22,11 +22,12 @@
     OneSignalDeferred.push(async function(OneSignal) {
   await OneSignal.init({
     appId: "d0db32c7-befc-419e-a2f2-0c2e1ca73959",
+    autoPrompt: false, // ← desativa o automático
     promptOptions: {
       slidedown: {
         prompts: [{
           type: "push",
-          autoPrompt: true,
+          autoPrompt: false,
           text: {
             actionMessage: "Receba notificações sobre suas atividades e demandas do AMVS Digital.",
             acceptButton: "Permitir",
@@ -37,7 +38,6 @@
     }
   });
 
-  // Salva o Player ID quando inscrever
   async function enviarPlayerIdAoGAS(playerId) {
     if (!playerId) return;
     await fetch(baseUrlAppsScript, {
@@ -47,16 +47,21 @@
     });
   }
 
-  // Já estava inscrito
   const playerIdAtual = OneSignal.User.PushSubscription.id;
   if (playerIdAtual && OneSignal.User.PushSubscription.optedIn) {
     enviarPlayerIdAoGAS(playerIdAtual);
   }
 
-  // Acabou de inscrever
   OneSignal.User.PushSubscription.addEventListener("change", function(e) {
     if (e.current.optedIn) enviarPlayerIdAoGAS(e.current.id);
   });
+
+  // Exibe o prompt após 15 segundos
+  setTimeout(function() {
+    if (!OneSignal.User.PushSubscription.optedIn) {
+      OneSignal.Slidedown.promptPush();
+    }
+  }, 15000);
 });
 
     // ── Listener único (URL + login) ──────────────────
@@ -72,25 +77,6 @@
   }
   const iframe = document.getElementById('appFrame');
   iframe.src = path ? baseUrlAppsScript + "?page=" + path : baseUrlAppsScript;
-
-  // Exibe o prompt após 15 segundos (tempo suficiente para o usuário fazer login)
-  setTimeout(function() {
-  OneSignalDeferred.push(async function(OneSignal) {
-    const permission = OneSignal.Notifications.permission;
-    const optedIn = OneSignal.User.PushSubscription.optedIn;
-    console.log("🔔 permission:", permission, "optedIn:", optedIn);
-
-    if (permission === 'default') {
-      // Nunca perguntou — mostra o slidedown
-      await OneSignal.Slidedown.promptPush();
-    } else if (permission === 'granted' && !optedIn) {
-      // Tem permissão mas não está inscrito — força re-subscribe
-      await OneSignal.User.PushSubscription.optIn();
-    }
-    // Se permission === 'denied' — usuário bloqueou, não tem como forçar
-  });
-}, 15000);
-};
 
     // ── Carregamento do iframe ────────────────────────
     window.onload = function() {
