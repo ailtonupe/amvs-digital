@@ -12,7 +12,11 @@
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 </head>
 <body>
-  <iframe id="appFrame" allow="geolocation; camera; microphone" allowfullscreen></iframe>
+  <iframe
+    id="appFrame"
+    allow="geolocation; camera; microphone"
+    allowfullscreen>
+  </iframe>
 
   <script>
     const baseUrlAppsScript = "https://script.google.com/macros/s/AKfycbxBTCIRi8IjBt92IPFFAXG4HTcX5c9GF0eJjgfyry5ehA9tDgvscJelmk3ktfkHWuvJ/exec";
@@ -20,75 +24,77 @@
     // ── OneSignal ─────────────────────────────────────
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     OneSignalDeferred.push(async function(OneSignal) {
-  await OneSignal.init({
-    appId: "d0db32c7-befc-419e-a2f2-0c2e1ca73959",
-    autoPrompt: false, // ← desativa o automático
-    promptOptions: {
-      slidedown: {
-        prompts: [{
-          type: "push",
-          autoPrompt: false,
-          text: {
-            actionMessage: "Receba notificações sobre suas atividades e demandas do AMVS Digital.",
-            acceptButton: "Permitir",
-            cancelButton: "Agora não"
+      await OneSignal.init({
+        appId: "d0db32c7-befc-419e-a2f2-0c2e1ca73959",
+        autoPrompt: false,
+        promptOptions: {
+          slidedown: {
+            prompts: [{
+              type: "push",
+              autoPrompt: false,
+              text: {
+                actionMessage: "Receba notificações sobre suas atividades e demandas do AMVS Digital.",
+                acceptButton: "Permitir",
+                cancelButton: "Agora não"
+              }
+            }]
           }
-        }]
+        }
+      });
+
+      // Salva Player ID no GAS
+      async function enviarPlayerIdAoGAS(playerId) {
+        if (!playerId) return;
+        await fetch(baseUrlAppsScript, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ acao: "salvarPlayerId", playerId })
+        });
       }
-    }
-  });
 
-  async function enviarPlayerIdAoGAS(playerId) {
-    if (!playerId) return;
-    await fetch(baseUrlAppsScript, {
-      method: "POST", mode: "no-cors",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ acao: "salvarPlayerId", playerId })
+      // Já estava inscrito de sessão anterior
+      const playerIdAtual = OneSignal.User.PushSubscription.id;
+      if (playerIdAtual && OneSignal.User.PushSubscription.optedIn) {
+        enviarPlayerIdAoGAS(playerIdAtual);
+      }
+
+      // Acabou de aceitar agora
+      OneSignal.User.PushSubscription.addEventListener("change", function(e) {
+        if (e.current.optedIn) enviarPlayerIdAoGAS(e.current.id);
+      });
+
+      // Exibe o prompt após 15 segundos
+      setTimeout(function() {
+        if (!OneSignal.User.PushSubscription.optedIn) {
+          OneSignal.Slidedown.promptPush();
+        }
+      }, 15000);
     });
-  }
 
-  const playerIdAtual = OneSignal.User.PushSubscription.id;
-  if (playerIdAtual && OneSignal.User.PushSubscription.optedIn) {
-    enviarPlayerIdAoGAS(playerIdAtual);
-  }
-
-  OneSignal.User.PushSubscription.addEventListener("change", function(e) {
-    if (e.current.optedIn) enviarPlayerIdAoGAS(e.current.id);
-  });
-
-  // Exibe o prompt após 15 segundos
-  setTimeout(function() {
-    if (!OneSignal.User.PushSubscription.optedIn) {
-      OneSignal.Slidedown.promptPush();
-    }
-  }, 15000);
-});
-
-    // ── Listener único (URL + login) ──────────────────
-    window.onload = function() {
-  let path = "";
-  let redirect = sessionStorage.redirect;
-  delete sessionStorage.redirect;
-  if (redirect && redirect !== location.href) {
-    window.history.replaceState(null, null, redirect);
-    path = new URL(redirect).pathname.substring(1).replace(/\/$/, "");
-  } else {
-    path = window.location.pathname.substring(1).replace(/\/$/, "");
-  }
-  const iframe = document.getElementById('appFrame');
-  iframe.src = path ? baseUrlAppsScript + "?page=" + path : baseUrlAppsScript;
+    // ── Listener de mensagens do GAS ──────────────────
+    window.addEventListener('message', function(event) {
+      if (event.data?.sistema === 'AMVS_DIGITAL' && event.data?.acao === 'MUDAR_URL') {
+        const novoCaminho = '/' + event.data.caminho;
+        if (window.location.pathname !== novoCaminho) {
+          window.history.pushState(null, null, novoCaminho);
+        }
+      }
+    });
 
     // ── Carregamento do iframe ────────────────────────
     window.onload = function() {
       let path = "";
       let redirect = sessionStorage.redirect;
       delete sessionStorage.redirect;
+
       if (redirect && redirect !== location.href) {
         window.history.replaceState(null, null, redirect);
         path = new URL(redirect).pathname.substring(1).replace(/\/$/, "");
       } else {
         path = window.location.pathname.substring(1).replace(/\/$/, "");
       }
+
       const iframe = document.getElementById('appFrame');
       iframe.src = path ? baseUrlAppsScript + "?page=" + path : baseUrlAppsScript;
     };
