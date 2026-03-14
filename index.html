@@ -73,13 +73,21 @@
 
   // Exibe o prompt após 15 segundos (tempo suficiente para o usuário fazer login)
   setTimeout(function() {
-    OneSignalDeferred.push(function(OneSignal) {
-      if (!OneSignal.User.PushSubscription.optedIn) {
-        console.log("🔔 Exibindo prompt de notificação...");
-        OneSignal.Slidedown.promptPush();
-      }
-    });
-  }, 15000); // 15 segundos
+  OneSignalDeferred.push(async function(OneSignal) {
+    const permission = OneSignal.Notifications.permission;
+    const optedIn = OneSignal.User.PushSubscription.optedIn;
+    console.log("🔔 permission:", permission, "optedIn:", optedIn);
+
+    if (permission === 'default') {
+      // Nunca perguntou — mostra o slidedown
+      await OneSignal.Slidedown.promptPush();
+    } else if (permission === 'granted' && !optedIn) {
+      // Tem permissão mas não está inscrito — força re-subscribe
+      await OneSignal.User.PushSubscription.optIn();
+    }
+    // Se permission === 'denied' — usuário bloqueou, não tem como forçar
+  });
+}, 15000);
 };
 
     // ── Carregamento do iframe ────────────────────────
