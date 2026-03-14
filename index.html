@@ -26,12 +26,11 @@
     OneSignalDeferred.push(async function(OneSignal) {
       await OneSignal.init({
         appId: "d0db32c7-befc-419e-a2f2-0c2e1ca73959",
-        autoPrompt: false,
         promptOptions: {
           slidedown: {
             prompts: [{
               type: "push",
-              autoPrompt: false,
+              autoPrompt: true,
               text: {
                 actionMessage: "Receba notificações sobre suas atividades e demandas do AMVS Digital.",
                 acceptButton: "Permitir",
@@ -63,13 +62,6 @@
       OneSignal.User.PushSubscription.addEventListener("change", function(e) {
         if (e.current.optedIn) enviarPlayerIdAoGAS(e.current.id);
       });
-
-      // Exibe o prompt após 15 segundos
-      setTimeout(function() {
-        if (!OneSignal.User.PushSubscription.optedIn) {
-          OneSignal.Slidedown.promptPush();
-        }
-      }, 15000);
     });
 
     // ── Listener de mensagens do GAS ──────────────────
