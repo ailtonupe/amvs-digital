@@ -117,7 +117,9 @@
 
     // Escuta o sinal de login vindo do iframe do GAS
     window.addEventListener('message', function(event) {
-      if (event.data && event.data.sistema === 'AMVS_DIGITAL' && event.data.acao === 'USUARIO_LOGADO') {
+      if (event.origin === 'https://script.google.com' && 
+    event.data && event.data.sistema === 'AMVS_DIGITAL' && 
+    event.data.acao === 'USUARIO_LOGADO') {
         // Só mostra o prompt se ainda não está inscrito
         if (!OneSignal.User.PushSubscription.optedIn) {
           OneSignal.Slidedown.promptPush();
