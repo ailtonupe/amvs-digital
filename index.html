@@ -73,56 +73,58 @@
   window.OneSignalDeferred = window.OneSignalDeferred || [];
   OneSignalDeferred.push(async function(OneSignal) {
     await OneSignal.init({
-  appId: "d0db32c7-befc-419e-a2f2-0c2e1ca73959",
-  promptOptions: {
-    slidedown: {
-      prompts: [
-        {
-          type: "push",
-          autoPrompt: true,
-          text: {
-            actionMessage: "Receba notificações sobre suas atividades e demandas do AMVS Digital.",
-            acceptButton: "Permitir",
-            cancelButton: "Agora não",
-          }
+      appId: "d0db32c7-befc-419e-a2f2-0c2e1ca73959",
+      autoPrompt: false, // ← desativa o prompt automático
+      promptOptions: {
+        slidedown: {
+          prompts: [
+            {
+              type: "push",
+              autoPrompt: false,
+              text: {
+                actionMessage: "Receba notificações sobre suas atividades e demandas do AMVS Digital.",
+                acceptButton: "Permitir",
+                cancelButton: "Agora não",
+              }
+            }
+          ]
         }
-      ]
-    }
-  }
-});
+      }
+    });
 
-    // Função auxiliar para enviar o Player ID ao GAS
+    // Salva o Player ID se já estava inscrito
     async function enviarPlayerIdAoGAS(playerId) {
       if (!playerId) return;
-      try {
-        await fetch(baseUrlAppsScript, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            acao: "salvarPlayerId",
-            playerId: playerId
-          })
-        });
-        console.log("✅ Player ID enviado ao GAS:", playerId);
-      } catch(err) {
-        console.error("❌ Erro ao enviar Player ID:", err);
-      }
+      await fetch(baseUrlAppsScript, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "salvarPlayerId", playerId: playerId })
+      });
     }
 
-    // Caso o usuário JÁ estava inscrito em sessões anteriores
     const playerIdAtual = OneSignal.User.PushSubscription.id;
     const jaInscrito = OneSignal.User.PushSubscription.optedIn;
     if (playerIdAtual && jaInscrito) {
       enviarPlayerIdAoGAS(playerIdAtual);
     }
 
-    // Caso o usuário acabou de aceitar agora
     OneSignal.User.PushSubscription.addEventListener("change", function(event) {
       if (event.current.optedIn) {
         enviarPlayerIdAoGAS(event.current.id);
       }
     });
+
+    // Escuta o sinal de login vindo do iframe do GAS
+    window.addEventListener('message', function(event) {
+      if (event.data && event.data.sistema === 'AMVS_DIGITAL' && event.data.acao === 'USUARIO_LOGADO') {
+        // Só mostra o prompt se ainda não está inscrito
+        if (!OneSignal.User.PushSubscription.optedIn) {
+          OneSignal.Slidedown.promptPush();
+        }
+      }
+    });
+
   });
 </script>
 </body>
