@@ -20,42 +20,44 @@
     // ── OneSignal ─────────────────────────────────────
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     OneSignalDeferred.push(async function(OneSignal) {
-      await OneSignal.init({
-        appId: "d0db32c7-befc-419e-a2f2-0c2e1ca73959",
-        autoPrompt: false,
-        promptOptions: {
-          slidedown: {
-            prompts: [{
-              type: "push",
-              autoPrompt: false,
-              text: {
-                actionMessage: "Receba notificações sobre suas atividades e demandas do AMVS Digital.",
-                acceptButton: "Permitir",
-                cancelButton: "Agora não"
-              }
-            }]
+  await OneSignal.init({
+    appId: "d0db32c7-befc-419e-a2f2-0c2e1ca73959",
+    promptOptions: {
+      slidedown: {
+        prompts: [{
+          type: "push",
+          autoPrompt: true,
+          text: {
+            actionMessage: "Receba notificações sobre suas atividades e demandas do AMVS Digital.",
+            acceptButton: "Permitir",
+            cancelButton: "Agora não"
           }
-        }
-      });
-
-      async function enviarPlayerIdAoGAS(playerId) {
-        if (!playerId) return;
-        await fetch(baseUrlAppsScript, {
-          method: "POST", mode: "no-cors",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ acao: "salvarPlayerId", playerId })
-        });
+        }]
       }
+    }
+  });
 
-      const playerIdAtual = OneSignal.User.PushSubscription.id;
-      if (playerIdAtual && OneSignal.User.PushSubscription.optedIn) {
-        enviarPlayerIdAoGAS(playerIdAtual);
-      }
-
-      OneSignal.User.PushSubscription.addEventListener("change", function(e) {
-        if (e.current.optedIn) enviarPlayerIdAoGAS(e.current.id);
-      });
+  // Salva o Player ID quando inscrever
+  async function enviarPlayerIdAoGAS(playerId) {
+    if (!playerId) return;
+    await fetch(baseUrlAppsScript, {
+      method: "POST", mode: "no-cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ acao: "salvarPlayerId", playerId })
     });
+  }
+
+  // Já estava inscrito
+  const playerIdAtual = OneSignal.User.PushSubscription.id;
+  if (playerIdAtual && OneSignal.User.PushSubscription.optedIn) {
+    enviarPlayerIdAoGAS(playerIdAtual);
+  }
+
+  // Acabou de inscrever
+  OneSignal.User.PushSubscription.addEventListener("change", function(e) {
+    if (e.current.optedIn) enviarPlayerIdAoGAS(e.current.id);
+  });
+});
 
     // ── Listener único (URL + login) ──────────────────
     window.onload = function() {
