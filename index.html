@@ -14,48 +14,6 @@
       display: block;
     }
   </style>
-  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-<script>
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-  OneSignalDeferred.push(async function(OneSignal) {
-    await OneSignal.init({
-      appId: "d0db32c7-befc-419e-a2f2-0c2e1ca73959",
-    });
-
-    // Função auxiliar para enviar o Player ID ao GAS
-    async function enviarPlayerIdAoGAS(playerId) {
-      if (!playerId) return;
-      try {
-        await fetch(baseUrlAppsScript, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            acao: "salvarPlayerId",
-            playerId: playerId
-          })
-        });
-        console.log("✅ Player ID enviado ao GAS:", playerId);
-      } catch(err) {
-        console.error("❌ Erro ao enviar Player ID:", err);
-      }
-    }
-
-    // Caso o usuário JÁ estava inscrito em sessões anteriores
-    const playerIdAtual = OneSignal.User.PushSubscription.id;
-    const jaInscrito = OneSignal.User.PushSubscription.optedIn;
-    if (playerIdAtual && jaInscrito) {
-      enviarPlayerIdAoGAS(playerIdAtual);
-    }
-
-    // Caso o usuário acabou de aceitar agora
-    OneSignal.User.PushSubscription.addEventListener("change", function(event) {
-      if (event.current.optedIn) {
-        enviarPlayerIdAoGAS(event.current.id);
-      }
-    });
-  });
-</script>
 </head>
 <body>
   <iframe
@@ -109,5 +67,48 @@
         }
     });
   </script>
+
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script>
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal) {
+    await OneSignal.init({
+      appId: "d0db32c7-befc-419e-a2f2-0c2e1ca73959",
+    });
+
+    // Função auxiliar para enviar o Player ID ao GAS
+    async function enviarPlayerIdAoGAS(playerId) {
+      if (!playerId) return;
+      try {
+        await fetch(baseUrlAppsScript, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            acao: "salvarPlayerId",
+            playerId: playerId
+          })
+        });
+        console.log("✅ Player ID enviado ao GAS:", playerId);
+      } catch(err) {
+        console.error("❌ Erro ao enviar Player ID:", err);
+      }
+    }
+
+    // Caso o usuário JÁ estava inscrito em sessões anteriores
+    const playerIdAtual = OneSignal.User.PushSubscription.id;
+    const jaInscrito = OneSignal.User.PushSubscription.optedIn;
+    if (playerIdAtual && jaInscrito) {
+      enviarPlayerIdAoGAS(playerIdAtual);
+    }
+
+    // Caso o usuário acabou de aceitar agora
+    OneSignal.User.PushSubscription.addEventListener("change", function(event) {
+      if (event.current.optedIn) {
+        enviarPlayerIdAoGAS(event.current.id);
+      }
+    });
+  });
+</script>
 </body>
 </html>
