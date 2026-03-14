@@ -7,127 +7,93 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #f4f5f7; }
-    iframe {
-      width: 100%;
-      height: 100vh;
-      border: none;
-      display: block;
-    }
+    iframe { width: 100%; height: 100vh; border: none; display: block; }
   </style>
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 </head>
 <body>
-  <iframe
-    id="appFrame"
-    allow="geolocation; camera; microphone"
-    allowfullscreen>
-  </iframe>
+  <iframe id="appFrame" allow="geolocation; camera; microphone" allowfullscreen></iframe>
 
   <script>
-    // URL base do seu Web App no Apps Script
     const baseUrlAppsScript = "https://script.google.com/macros/s/AKfycbxBTCIRi8IjBt92IPFFAXG4HTcX5c9GF0eJjgfyry5ehA9tDgvscJelmk3ktfkHWuvJ/exec";
 
-    // 1. LÓGICA DE INTERCEPTAÇÃO E CARREGAMENTO
-    window.onload = function() {
-        let path = "";
-        
-        // Verifica se viemos de um redirecionamento do 404.html
-        let redirect = sessionStorage.redirect;
-        delete sessionStorage.redirect; // Limpa a memória imediatamente após ler
-
-        if (redirect && redirect !== location.href) {
-            // Se viemos do 404, reescrevemos a URL na barra de endereços para a original (ex: /dashboard)
-            window.history.replaceState(null, null, redirect);
-            
-            // Extraímos a rota para passar pro Apps Script
-            let urlObj = new URL(redirect);
-            path = urlObj.pathname.substring(1).replace(/\/$/, "");
-        } else {
-            // Se o usuário entrou direto pela raiz (amvsdigital.com.br/)
-            path = window.location.pathname.substring(1).replace(/\/$/, "");
-        }
-
-        // Injeta a URL correta no iframe
-        const iframe = document.getElementById('appFrame');
-        if (path) {
-            iframe.src = baseUrlAppsScript + "?page=" + path;
-        } else {
-            iframe.src = baseUrlAppsScript;
-        }
-    };
-
-    // 2. COMUNICAÇÃO COM O APPS SCRIPT (Atualiza a URL enquanto o usuário navega)
-    window.addEventListener('message', function(event) {
-        if (event.data && event.data.sistema === 'AMVS_DIGITAL' && event.data.acao === 'MUDAR_URL') {
-            const novoCaminho = '/' + event.data.caminho;
-            
-            if (window.location.pathname !== novoCaminho) {
-                // Atualiza a barra de endereço sem recarregar a tela
-                window.history.pushState(null, null, novoCaminho);
-            }
-        }
-    });
-  </script>
-
-  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-<script>
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-  OneSignalDeferred.push(async function(OneSignal) {
-    await OneSignal.init({
-      appId: "d0db32c7-befc-419e-a2f2-0c2e1ca73959",
-      autoPrompt: false, // ← desativa o prompt automático
-      promptOptions: {
-        slidedown: {
-          prompts: [
-            {
+    // ── OneSignal ─────────────────────────────────────
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+      await OneSignal.init({
+        appId: "d0db32c7-befc-419e-a2f2-0c2e1ca73959",
+        autoPrompt: false,
+        promptOptions: {
+          slidedown: {
+            prompts: [{
               type: "push",
               autoPrompt: false,
               text: {
                 actionMessage: "Receba notificações sobre suas atividades e demandas do AMVS Digital.",
                 acceptButton: "Permitir",
-                cancelButton: "Agora não",
+                cancelButton: "Agora não"
               }
-            }
-          ]
+            }]
+          }
         }
-      }
-    });
-
-    // Salva o Player ID se já estava inscrito
-    async function enviarPlayerIdAoGAS(playerId) {
-      if (!playerId) return;
-      await fetch(baseUrlAppsScript, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ acao: "salvarPlayerId", playerId: playerId })
       });
-    }
 
-    const playerIdAtual = OneSignal.User.PushSubscription.id;
-    const jaInscrito = OneSignal.User.PushSubscription.optedIn;
-    if (playerIdAtual && jaInscrito) {
-      enviarPlayerIdAoGAS(playerIdAtual);
-    }
-
-    OneSignal.User.PushSubscription.addEventListener("change", function(event) {
-      if (event.current.optedIn) {
-        enviarPlayerIdAoGAS(event.current.id);
+      async function enviarPlayerIdAoGAS(playerId) {
+        if (!playerId) return;
+        await fetch(baseUrlAppsScript, {
+          method: "POST", mode: "no-cors",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ acao: "salvarPlayerId", playerId })
+        });
       }
+
+      const playerIdAtual = OneSignal.User.PushSubscription.id;
+      if (playerIdAtual && OneSignal.User.PushSubscription.optedIn) {
+        enviarPlayerIdAoGAS(playerIdAtual);
+      }
+
+      OneSignal.User.PushSubscription.addEventListener("change", function(e) {
+        if (e.current.optedIn) enviarPlayerIdAoGAS(e.current.id);
+      });
     });
 
-    // Escuta o sinal de login vindo do iframe do GAS
+    // ── Listener único (URL + login) ──────────────────
     window.addEventListener('message', function(event) {
-      if (event.origin === 'https://script.google.com' && 
-    event.data && event.data.sistema === 'AMVS_DIGITAL' && 
-    event.data.acao === 'USUARIO_LOGADO') {
-        // Só mostra o prompt se ainda não está inscrito
-        if (!OneSignal.User.PushSubscription.optedIn) {
-          OneSignal.Slidedown.promptPush();
+
+      // 1. Atualiza a URL ao navegar
+      if (event.data?.sistema === 'AMVS_DIGITAL' && event.data?.acao === 'MUDAR_URL') {
+        const novoCaminho = '/' + event.data.caminho;
+        if (window.location.pathname !== novoCaminho) {
+          window.history.pushState(null, null, novoCaminho);
         }
       }
+
+      // 2. Exibe prompt do OneSignal após login
+      if (event.data?.sistema === 'AMVS_DIGITAL' &&
+          event.data?.token   === 'amvs2026'    &&
+          event.data?.acao    === 'USUARIO_LOGADO') {
+        OneSignalDeferred.push(function(OneSignal) {
+          if (!OneSignal.User.PushSubscription.optedIn) {
+            OneSignal.Slidedown.promptPush();
+          }
+        });
+      }
     });
 
-  });
-</script>
+    // ── Carregamento do iframe ────────────────────────
+    window.onload = function() {
+      let path = "";
+      let redirect = sessionStorage.redirect;
+      delete sessionStorage.redirect;
+      if (redirect && redirect !== location.href) {
+        window.history.replaceState(null, null, redirect);
+        path = new URL(redirect).pathname.substring(1).replace(/\/$/, "");
+      } else {
+        path = window.location.pathname.substring(1).replace(/\/$/, "");
+      }
+      const iframe = document.getElementById('appFrame');
+      iframe.src = path ? baseUrlAppsScript + "?page=" + path : baseUrlAppsScript;
+    };
+  </script>
 </body>
 </html>
