@@ -59,6 +59,8 @@
 
     // ── Listener único (URL + login) ──────────────────
     window.addEventListener('message', function(event) {
+  // Debug — mostra TODAS as mensagens recebidas
+  console.log("📨 postMessage recebido:", event.data);
 
   // 1. Atualiza a URL ao navegar
   if (event.data?.sistema === 'AMVS_DIGITAL' && event.data?.acao === 'MUDAR_URL') {
@@ -67,12 +69,17 @@
       window.history.pushState(null, null, novoCaminho);
     }
 
-    // 2. Se mudou para qualquer rota autenticada (não é login), considera logado
+    console.log("🔀 Rota detectada:", event.data.caminho);
+
     const rotasAutenticadas = ['busca', 'dashboard', 'processos', 'atividades'];
     if (rotasAutenticadas.includes(event.data.caminho)) {
+      console.log("✅ Rota autenticada! Tentando exibir prompt...");
       OneSignalDeferred.push(function(OneSignal) {
+        console.log("🔔 optedIn:", OneSignal.User.PushSubscription.optedIn);
         if (!OneSignal.User.PushSubscription.optedIn) {
           OneSignal.Slidedown.promptPush();
+        } else {
+          console.log("⚠️ Usuário já está inscrito, prompt não exibido.");
         }
       });
     }
