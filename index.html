@@ -71,29 +71,15 @@
   const iframe = document.getElementById('appFrame');
   iframe.src = path ? baseUrlAppsScript + "?page=" + path : baseUrlAppsScript;
 
-  // Monitora a URL do iframe para detectar login
-  const rotasAutenticadas = ['busca', 'dashboard', 'processos', 'minhasatividades', 'legis'];
-  let promptJaExibido = false;
-
-  setInterval(function() {
-    try {
-      const hash = iframe.contentWindow.location.hash.replace('#', '');
-      const href = iframe.contentWindow.location.href;
-      console.log("📍 iframe hash:", hash, "href:", href);
-
-      if (!promptJaExibido && rotasAutenticadas.some(r => hash.includes(r) || href.includes(r))) {
-        promptJaExibido = true;
-        console.log("✅ Login detectado! Exibindo prompt...");
-        OneSignalDeferred.push(function(OneSignal) {
-          if (!OneSignal.User.PushSubscription.optedIn) {
-            OneSignal.Slidedown.promptPush();
-          }
-        });
+  // Exibe o prompt após 15 segundos (tempo suficiente para o usuário fazer login)
+  setTimeout(function() {
+    OneSignalDeferred.push(function(OneSignal) {
+      if (!OneSignal.User.PushSubscription.optedIn) {
+        console.log("🔔 Exibindo prompt de notificação...");
+        OneSignal.Slidedown.promptPush();
       }
-    } catch(e) {
-      // cross-origin — ignorado
-    }
-  }, 1000);
+    });
+  }, 15000); // 15 segundos
 };
 
     // ── Carregamento do iframe ────────────────────────
