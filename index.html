@@ -7,7 +7,15 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #f4f5f7; }
-    iframe { width: 100%; height: 100vh; border: none; display: block; }
+    /* depois */
+    iframe {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      width: 100%;
+      height: 100vh;    /* fallback */
+      height: 100dvh;   /* acompanha a barra do navegador */
+      border: none; display: block;
+    }
   </style>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 </head>
