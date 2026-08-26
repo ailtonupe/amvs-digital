@@ -85,18 +85,32 @@
     // ── Carregamento do iframe ────────────────────────
     window.onload = function() {
       let path = "";
+      let search = window.location.search || "";
       let redirect = sessionStorage.redirect;
       delete sessionStorage.redirect;
 
       if (redirect && redirect !== location.href) {
         window.history.replaceState(null, null, redirect);
-        path = new URL(redirect).pathname.substring(1).replace(/\/$/, "");
+        try {
+          const urlObj = new URL(redirect);
+          path = urlObj.pathname.substring(1).replace(/\/$/, "");
+          if (!search && urlObj.search) search = urlObj.search;
+        } catch (e) {}
       } else {
         path = window.location.pathname.substring(1).replace(/\/$/, "");
       }
 
       const iframe = document.getElementById('appFrame');
-      iframe.src = path ? baseUrlAppsScript + "?page=" + path : baseUrlAppsScript;
+      let finalUrl = baseUrlAppsScript;
+      const params = new URLSearchParams(search);
+      if (path && !params.has('page')) {
+        params.set('page', path);
+      }
+      const qs = params.toString();
+      if (qs) {
+        finalUrl += (finalUrl.includes('?') ? '&' : '?') + qs;
+      }
+      iframe.src = finalUrl;
     };
   </script>
 </body>
