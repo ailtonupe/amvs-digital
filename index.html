@@ -29,7 +29,78 @@
   <script>
     const baseUrlAppsScript = "https://script.google.com/macros/s/AKfycbxBTCIRi8IjBt92IPFFAXG4HTcX5c9GF0eJjgfyry5ehA9tDgvscJelmk3ktfkHWuvJ/exec";
 
-    // ── OneSignal ─────────────────────────────────────
+    // ── Estado do Fiscal ──────────────────────────────
+    let currentFiscal = null;
+    try {
+      const salvo = localStorage.getItem('amvs_fiscal_push');
+      if (salvo) currentFiscal = JSON.parse(salvo);
+    } catch(e) {}
+
+    // ── Resposta de Status ao Iframe ──────────────────
+    function enviarStatusPushAoIframe(statusForcado) {
+      const iframe = document.getElementById('appFrame');
+      if (!iframe || !iframe.contentWindow) return;
+
+      let permission = 'default';
+      let optedIn = false;
+      let playerId = null;
+
+      if (typeof Notification !== 'undefined') {
+        permission = Notification.permission;
+      }
+      if (window.OneSignal && OneSignal.User && OneSignal.User.PushSubscription) {
+        optedIn = !!OneSignal.User.PushSubscription.optedIn;
+        playerId = OneSignal.User.PushSubscription.id || null;
+      }
+
+      let status = statusForcado;
+      if (!status) {
+        if (permission === 'denied') {
+          status = 'bloqueado_navegador';
+        } else if (optedIn && playerId) {
+          status = 'ativo';
+        } else if (permission === 'granted') {
+          status = 'permitido_nao_inscrito';
+        } else {
+          status = 'pendente';
+        }
+      }
+
+      iframe.contentWindow.postMessage({
+        sistema: 'AMVS_DIGITAL',
+        acao: 'RESPOSTA_STATUS_PUSH',
+        status: status,
+        permission: permission,
+        optedIn: optedIn,
+        playerId: playerId,
+        fiscal: currentFiscal
+      }, '*');
+    }
+
+    // ── Salva Player ID no GAS ────────────────────────
+    async function enviarPlayerIdAoGAS(playerId, optedIn, fiscal) {
+      if (!playerId) return;
+      const f = fiscal || currentFiscal || {};
+      try {
+        await fetch(baseUrlAppsScript, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            acao: "salvarPlayerId",
+            playerId: playerId,
+            optedIn: optedIn !== false,
+            usuarioId: f.id || "",
+            usuarioNome: f.nome || "",
+            usuarioCpf: f.cpf || ""
+          })
+        });
+      } catch (err) {
+        console.warn("[OneSignal] Erro ao enviar Player ID ao GAS:", err);
+      }
+    }
+
+    // ── OneSignal Inicialização ───────────────────────
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     OneSignalDeferred.push(async function(OneSignal) {
       await OneSignal.init({
@@ -49,36 +120,109 @@
         }
       });
 
-      // Salva Player ID no GAS
-      async function enviarPlayerIdAoGAS(playerId) {
-        if (!playerId) return;
-        await fetch(baseUrlAppsScript, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ acao: "salvarPlayerId", playerId })
-        });
+      // Se já temos o fiscal em cache, reaplica identificação
+      if (currentFiscal && currentFiscal.id) {
+        try {
+          OneSignal.login(currentFiscal.id);
+          OneSignal.User.addTag("fiscal_id", currentFiscal.id);
+          OneSignal.User.addTag("fiscal_nome", currentFiscal.nome);
+        } catch(e) {}
       }
 
       // Já estava inscrito de sessão anterior
       const playerIdAtual = OneSignal.User.PushSubscription.id;
-      if (playerIdAtual && OneSignal.User.PushSubscription.optedIn) {
-        enviarPlayerIdAoGAS(playerIdAtual);
+      const optedInAtual = !!OneSignal.User.PushSubscription.optedIn;
+      if (playerIdAtual && optedInAtual) {
+        enviarPlayerIdAoGAS(playerIdAtual, true);
       }
 
-      // Acabou de aceitar agora
+      // Notifica o iframe se ele já estiver pronto
+      enviarStatusPushAoIframe();
+
+      // Monitora alterações na inscrição
       OneSignal.User.PushSubscription.addEventListener("change", function(e) {
-        if (e.current.optedIn) enviarPlayerIdAoGAS(e.current.id);
+        const id = e.current.id;
+        const opt = !!e.current.optedIn;
+        if (id) {
+          enviarPlayerIdAoGAS(id, opt);
+        }
+        enviarStatusPushAoIframe(opt ? 'ativo' : undefined);
       });
     });
 
-    // ── Listener de mensagens do GAS ──────────────────
+    // ── Listener de mensagens do GAS (Iframe) ────────
     window.addEventListener('message', function(event) {
-      if (event.data?.sistema === 'AMVS_DIGITAL' && event.data?.acao === 'MUDAR_URL') {
+      if (!event.data || event.data.sistema !== 'AMVS_DIGITAL') return;
+
+      // 1. Mudança de rota amigável
+      if (event.data.acao === 'MUDAR_URL') {
         const novoCaminho = '/' + event.data.caminho;
         if (window.location.pathname !== novoCaminho) {
           window.history.pushState(null, null, novoCaminho);
         }
+      }
+
+      // 2. Vinculação do fiscal logado
+      if (event.data.acao === 'VINCULAR_USUARIO_PUSH') {
+        const u = event.data.usuario;
+        if (u && u.id) {
+          currentFiscal = { id: String(u.id), nome: String(u.nome || ''), cpf: String(u.cpf || '') };
+          try {
+            localStorage.setItem('amvs_fiscal_push', JSON.stringify(currentFiscal));
+          } catch(e) {}
+
+          if (window.OneSignal && OneSignal.User) {
+            try {
+              OneSignal.login(currentFiscal.id);
+              OneSignal.User.addTag("fiscal_id", currentFiscal.id);
+              OneSignal.User.addTag("fiscal_nome", currentFiscal.nome);
+              OneSignal.User.addTag("fiscal_cpf", currentFiscal.cpf);
+            } catch(eLogin) {
+              console.warn("[OneSignal] Erro ao associar tags do fiscal:", eLogin);
+            }
+
+            const pid = OneSignal.User.PushSubscription.id;
+            const opt = !!OneSignal.User.PushSubscription.optedIn;
+            if (pid) {
+              enviarPlayerIdAoGAS(pid, opt, currentFiscal);
+            }
+          }
+          enviarStatusPushAoIframe();
+        }
+      }
+
+      // 3. Consulta de status
+      if (event.data.acao === 'CONSULTAR_STATUS_PUSH') {
+        enviarStatusPushAoIframe();
+      }
+
+      // 4. Solicitação de ativação pelo fiscal
+      if (event.data.acao === 'SOLICITAR_ATIVAR_PUSH') {
+        if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+          enviarStatusPushAoIframe('bloqueado_navegador');
+          return;
+        }
+        if (window.OneSignal && OneSignal.User) {
+          try {
+            OneSignal.User.PushSubscription.optIn();
+          } catch(eOpt) {
+            try {
+              OneSignal.Slidedown.promptPush();
+            } catch(eSl) {
+              console.warn("[OneSignal] Erro no prompt de push:", eSl);
+            }
+          }
+        }
+      }
+
+      // 5. Logout do usuário
+      if (event.data.acao === 'LOGOUT_USUARIO_PUSH') {
+        currentFiscal = null;
+        try { localStorage.removeItem('amvs_fiscal_push'); } catch(e) {}
+        if (window.OneSignal) {
+          try { OneSignal.logout(); } catch(e) {}
+        }
+        enviarStatusPushAoIframe();
       }
     });
 
