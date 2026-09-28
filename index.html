@@ -150,9 +150,18 @@
       });
     });
 
-    // ── Listener de mensagens do GAS (Iframe) ────────
+    // ── Listener de mensagens do GAS (Iframe) e Scanner ────────
     window.addEventListener('message', function(event) {
       if (!event.data || event.data.sistema !== 'AMVS_DIGITAL') return;
+
+      // Repasse de eventos de scanner/produtos para o iframe do sistema
+      if (event.data.tipo === 'AMVS_PRODUTOS_ATUALIZADOS' || event.data.tipo === 'AMVS_BARCODE_ESCANEADO') {
+        const iframe = document.getElementById('appFrame');
+        if (iframe && iframe.contentWindow) {
+          iframe.contentWindow.postMessage(event.data, '*');
+        }
+        return;
+      }
 
       // 1. Mudança de rota amigável
       if (event.data.acao === 'MUDAR_URL') {
@@ -223,6 +232,18 @@
           try { OneSignal.logout(); } catch(e) {}
         }
         enviarStatusPushAoIframe();
+      }
+    });
+
+    // ── Sincronização de Storage do Scanner para o Iframe ──
+    window.addEventListener('storage', function(e) {
+      if ((e.key === 'amvs_autos_itens_temp' || e.key === 'amvs_scan_resultado') && e.newValue) {
+        const iframe = document.getElementById('appFrame');
+        if (iframe && iframe.contentWindow) {
+          try {
+            iframe.contentWindow.postMessage(JSON.parse(e.newValue), '*');
+          } catch(err) {}
+        }
       }
     });
 
