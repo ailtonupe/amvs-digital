@@ -3,26 +3,32 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Scanner de Código de Barras - AMVS Digital</title>
+  <title>Leitor de Código de Barras - AMVS Digital</title>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body, html { width: 100%; height: 100%; background: #0a0e1a; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+    body, html {
+      width: 100%; height: 100%; background: #0a0e1a; color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow: hidden; user-select: none;
+    }
     
+    /* CABEÇALHO SUPERIOR */
     .scanner-header {
-      position: fixed; top: 0; left: 0; right: 0; height: 56px;
-      background: rgba(10, 14, 26, 0.92); backdrop-filter: blur(8px);
+      position: fixed; top: 0; left: 0; right: 0; height: 52px;
+      background: rgba(10, 14, 26, 0.95); backdrop-filter: blur(8px);
       display: flex; align-items: center; justify-content: space-between;
-      padding: 0 16px; z-index: 100; border-bottom: 1px solid rgba(255,255,255,0.1);
+      padding: 0 14px; z-index: 100; border-bottom: 1px solid rgba(255,255,255,0.12);
     }
     .scanner-header-title {
-      font-size: 1.05rem; font-weight: 700; color: #e8eaf6; display: flex; align-items: center; gap: 8px;
+      font-size: 1rem; font-weight: 700; color: #e8eaf6; display: flex; align-items: center; gap: 8px;
     }
     
+    /* ÁREA DA CÂMERA */
     #reader-container {
-      position: fixed; top: 56px; bottom: 120px; left: 0; right: 0;
+      position: fixed; top: 52px; bottom: 220px; left: 0; right: 0;
       display: flex; align-items: center; justify-content: center; background: #000;
     }
     #reader {
@@ -32,62 +38,96 @@
       object-fit: cover !important; width: 100% !important; height: 100% !important;
     }
 
-    /* Retículo / Mira de Leitura */
+    /* MIRA / RETÍCULO LASER */
     .reticulo-overlay {
-      position: absolute; width: 82%; max-width: 380px; height: 210px;
-      border: 2px solid rgba(255, 255, 255, 0.4); border-radius: 12px;
-      pointer-events: none; z-index: 50; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+      position: absolute; width: 84%; max-width: 380px; height: 170px;
+      border: 2px solid rgba(255, 255, 255, 0.35); border-radius: 12px;
+      pointer-events: none; z-index: 50; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.42);
       display: flex; flex-direction: column; justify-content: space-between; padding: 6px;
     }
-    .reticulo-canto-tl { width: 22px; height: 22px; border-top: 4px solid #00e676; border-left: 4px solid #00e676; border-radius: 4px 0 0 0; }
-    .reticulo-canto-tr { width: 22px; height: 22px; border-top: 4px solid #00e676; border-right: 4px solid #00e676; border-radius: 0 4px 0 0; align-self: flex-end; }
-    .reticulo-canto-bl { width: 22px; height: 22px; border-bottom: 4px solid #00e676; border-left: 4px solid #00e676; border-radius: 0 0 0 4px; }
-    .reticulo-canto-br { width: 22px; height: 22px; border-bottom: 4px solid #00e676; border-right: 4px solid #00e676; border-radius: 0 0 4px 0; align-self: flex-end; }
+    .reticulo-canto-tl { width: 20px; height: 20px; border-top: 4px solid #00e676; border-left: 4px solid #00e676; border-radius: 4px 0 0 0; }
+    .reticulo-canto-tr { width: 20px; height: 20px; border-top: 4px solid #00e676; border-right: 4px solid #00e676; border-radius: 0 4px 0 0; align-self: flex-end; }
+    .reticulo-canto-bl { width: 20px; height: 20px; border-bottom: 4px solid #00e676; border-left: 4px solid #00e676; border-radius: 0 0 0 4px; }
+    .reticulo-canto-br { width: 20px; height: 20px; border-bottom: 4px solid #00e676; border-right: 4px solid #00e676; border-radius: 0 0 4px 0; align-self: flex-end; }
     
     .linha-laser {
       position: absolute; top: 10%; left: 5%; width: 90%; height: 2px;
       background: linear-gradient(90deg, transparent, #00e676, transparent);
       box-shadow: 0 0 10px #00e676;
-      animation: laserScan 2s infinite ease-in-out;
+      animation: laserScan 1.8s infinite ease-in-out;
     }
     @keyframes laserScan {
       0%, 100% { top: 12%; opacity: 0.3; }
       50% { top: 88%; opacity: 1; }
     }
 
-    /* Rodapé com Controles e Último Item */
-    .scanner-footer {
-      position: fixed; bottom: 0; left: 0; right: 0; height: 120px;
-      background: rgba(10, 14, 26, 0.95); backdrop-filter: blur(8px);
-      padding: 12px 16px; z-index: 100; border-top: 1px solid rgba(255,255,255,0.1);
-      display: flex; flex-direction: column; justify-content: space-between;
+    /* PAINEL INFERIOR: CARRINHO DE ITENS ESCANEADOS */
+    .scanner-drawer {
+      position: fixed; bottom: 0; left: 0; right: 0; height: 220px;
+      background: #141b2d; border-top: 1px solid rgba(255,255,255,0.15);
+      z-index: 100; display: flex; flex-direction: column;
     }
-    .scanner-status {
-      text-align: center; font-size: 0.85rem; color: #b0bec5;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    .scanner-drawer-header {
+      padding: 8px 14px; background: #1a233a; display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 0.85rem; font-weight: 700; color: #b0bec5;
     }
-    .scanner-status.sucesso {
-      color: #00e676; font-weight: 700; font-size: 0.95rem;
+    .scanner-drawer-list {
+      flex: 1; overflow-y: auto; padding: 6px 12px;
     }
-    .scanner-acoes {
-      display: flex; gap: 10px; align-items: center; justify-content: space-between;
+    .scanned-item-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(255,255,255,0.05); padding: 8px 10px; border-radius: 6px;
+      margin-bottom: 6px; font-size: 0.82rem; border-left: 3px solid #00e676;
+    }
+    .scanned-item-info {
+      flex: 1; overflow: hidden; padding-right: 8px;
+    }
+    .scanned-item-name {
+      font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .scanned-item-sub {
+      font-size: 0.72rem; color: #90a4ae; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .scanned-item-ctrls {
+      display: flex; align-items: center; gap: 4px;
+    }
+    .btn-qty {
+      width: 26px; height: 26px; line-height: 26px; text-align: center; border-radius: 4px;
+      background: #2a3b5c; color: #fff; cursor: pointer; font-weight: bold; border: none;
+    }
+    .item-qty-val {
+      min-width: 24px; text-align: center; font-weight: 700; color: #00e676; font-size: 0.9rem;
+    }
+    
+    /* BARRA DE AÇÃO FINAL */
+    .scanner-bottom-bar {
+      padding: 8px 14px; background: #0e1424; display: flex; gap: 10px; align-items: center;
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+    .scanner-flash-success {
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 230, 118, 0.25); pointer-events: none; z-index: 60;
+      opacity: 0; transition: opacity 0.15s ease-out;
     }
   </style>
 </head>
 <body>
 
+  <!-- FLASH VISUAL VERDE AO ESCANEAR -->
+  <div id="flashOverlay" class="scanner-flash-success"></div>
+
   <!-- CABEÇALHO -->
   <div class="scanner-header">
     <div class="scanner-header-title">
-      <i class="material-icons" style="color: #00e676;">qr_code_scanner</i>
+      <i class="material-icons" style="color: #00e676; font-size: 1.3rem;">qr_code_scanner</i>
       <span>Scanner AMVS Digital</span>
     </div>
     <div style="display: flex; gap: 8px;">
       <button id="btnTorch" onclick="alternarLanterna()" class="btn-floating btn-small grey darken-3 waves-effect" title="Lanterna">
-        <i class="material-icons" id="iconTorch">flash_on</i>
+        <i class="material-icons" id="iconTorch" style="font-size: 1.1rem;">flash_on</i>
       </button>
-      <button onclick="concluirScanner()" class="btn-floating btn-small red darken-3 waves-effect" title="Fechar">
-        <i class="material-icons">close</i>
+      <button onclick="concluirEFechar()" class="btn-floating btn-small red darken-3 waves-effect" title="Fechar">
+        <i class="material-icons" style="font-size: 1.1rem;">close</i>
       </button>
     </div>
   </div>
@@ -108,124 +148,265 @@
     </div>
   </div>
 
-  <!-- RODAPÉ -->
-  <div class="scanner-footer">
-    <div id="lblStatus" class="scanner-status">
-      Aponte a câmera para o código de barras (EAN-13, QR Code)
+  <!-- PAINEL INFERIOR: LISTA DE PRODUTOS APREENDIDOS -->
+  <div class="scanner-drawer">
+    <div class="scanner-drawer-header">
+      <span id="lblTituloLista"><i class="material-icons tiny left" style="vertical-align: middle;">shopping_cart</i>0 produto(s) apreendido(s)</span>
+      <span id="lblBaseCmedStatus" style="font-size: 0.72rem; color: #4db6ac; font-weight: normal;">Base CMED Carregada</span>
     </div>
-    
-    <div class="scanner-acoes">
-      <div style="display: flex; align-items: center; gap: 6px;">
-        <label style="cursor: pointer; display: flex; align-items: center; gap: 6px; color: #cfd8dc; font-size: 0.8rem;">
-          <input type="checkbox" id="chkContinuo" class="filled-in" checked />
-          <span>Leitura Contínua</span>
-        </label>
-      </div>
 
-      <div style="display: flex; gap: 8px;">
-        <span id="badgeContador" class="chip grey darken-3 white-text" style="font-size: 0.8rem; height: 32px; line-height: 32px; margin: 0;">
-          0 lido(s)
-        </span>
-        <button onclick="concluirScanner()" class="btn-small green darken-2 waves-effect" style="border-radius: 20px; font-weight: bold;">
-          <i class="material-icons left tiny">check</i>Concluir
-        </button>
+    <div class="scanner-drawer-list" id="listaItensScaneados">
+      <div id="msgListaVazia" style="text-align: center; color: #78909c; font-style: italic; padding: 20px 0; font-size: 0.82rem;">
+        Aponte a câmera para os códigos de barra dos medicamentos apreendidos...
       </div>
+    </div>
+
+    <!-- BOTÕES DE AÇÃO INFERIORES -->
+    <div class="scanner-bottom-bar">
+      <button type="button" onclick="concluirEFechar()" class="btn waves-effect waves-light green darken-2 w100" style="width: 100%; height: 44px; line-height: 44px; font-weight: 700; border-radius: 6px; text-transform: none; display: flex; align-items: center; justify-content: center; gap: 8px;">
+        <i class="material-icons">check_circle</i>
+        <span id="btnConcluirTexto">CONCLUIR E ADICIONAR AO AUTO</span>
+      </button>
     </div>
   </div>
 
   <script>
-    var html5QrCode = null;
-    var totalLidos = 0;
-    var ultimoCodigo = '';
-    var debounceTimer = null;
-    var torchAtivo = false;
+    // ─── ÁUDIO ROBUSTO (WAV BASE64 + WEBAUDIO + VIBRAÇÃO) ───
+    var audioCtx = null;
+    var audioLiberado = false;
+    var beepWavAudio = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU...");
 
-    function tocarBeep() {
+    function destravarAudio() {
+      if (audioLiberado) return;
       try {
-        var ctx = new (window.AudioContext || window.webkitAudioContext)();
-        var osc = ctx.createOscillator();
-        var gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(1200, ctx.currentTime);
-        gain.gain.setValueAtTime(0.3, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.13);
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        audioLiberado = true;
       } catch(e) {}
-      if (navigator.vibrate) navigator.vibrate(100);
     }
+    document.addEventListener('touchstart', destravarAudio, { passive: true });
+    document.addEventListener('click', destravarAudio);
 
-    function enviarCodigoAoSistema(codigo) {
-      // 1. Envia via postMessage para o opener (App AMVS)
-      if (window.opener && !window.opener.closed) {
-        window.opener.postMessage({
-          sistema: 'AMVS_DIGITAL',
-          tipo: 'AMVS_BARCODE_ESCANEADO',
-          codigo: codigo
-        }, '*');
+    function emitirBeepSucesso() {
+      destravarAudio();
+
+      // 1. Tenta sintetizar oscilador WebAudio
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        var osc = audioCtx.createOscillator();
+        var gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1400, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.13);
+      } catch(e) {}
+
+      // 2. Toca elemento Audio como redundância
+      try {
+        beepWavAudio.currentTime = 0;
+        beepWavAudio.play().catch(function(){});
+      } catch(e) {}
+
+      // 3. Vibração tátil no aparelho
+      if (navigator.vibrate) {
+        try { navigator.vibrate([100, 50, 100]); } catch(e) {}
       }
 
-      // 2. Persiste em localStorage para redundância
+      // 4. Flash verde visual na tela
+      var fl = document.getElementById('flashOverlay');
+      if (fl) {
+        fl.style.opacity = '1';
+        setTimeout(function() { fl.style.opacity = '0'; }, 180);
+      }
+    }
+
+    // ─── BASE CMED EM MEMÓRIA LOCAL (BUSCA EM 0 MILISSEGUNDOS) ───
+    var BASE_CMED = {};
+    var ITENS_ESCANEADOS = [];
+    var ultimoCodigo = '';
+    var debounceTimer = null;
+    var html5QrCode = null;
+    var torchAtivo = false;
+
+    function carregarBaseCmedLocal() {
+      var elStatus = document.getElementById('lblBaseCmedStatus');
+      fetch('cmed_base.json')
+        .then(function(res) {
+          if (!res.ok) throw new Error('Status ' + res.status);
+          return res.json();
+        })
+        .then(function(data) {
+          BASE_CMED = data || {};
+          var total = Object.keys(BASE_CMED).length;
+          if (elStatus) elStatus.innerText = 'CMED: ' + total.toLocaleString('pt-BR') + ' remédios';
+        })
+        .catch(function(err) {
+          console.warn('[carregarBaseCmedLocal] Aviso:', err);
+          if (elStatus) elStatus.innerText = 'CMED Online';
+        });
+    }
+
+    // ─── PROCESSAMENTO DO CÓDIGO DETECTADO ───
+    function aoDetectarCodigo(decodedText) {
+      var ean = String(decodedText || '').trim();
+      if (!ean) return;
+
+      // Debounce rápido para evitar leitura repetida do mesmo item em menos de 1.4s
+      if (ean === ultimoCodigo) return;
+      ultimoCodigo = ean;
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(function() { ultimoCodigo = ''; }, 1400);
+
+      emitirBeepSucesso();
+
+      // Procura produto no CMED em memória (instantâneo!)
+      var prodInfo = BASE_CMED[ean];
+      var nomeProd = prodInfo ? (prodInfo.p || prodInfo.prod || 'Medicamento') : ('Produto ' + ean);
+      var marca = prodInfo ? (prodInfo.m || prodInfo.lab || '---') : '---';
+      var apres = prodInfo ? (prodInfo.a || prodInfo.apres || '') : '';
+      var reg = prodInfo ? (prodInfo.r || prodInfo.reg || '') : '';
+      var subst = prodInfo ? (prodInfo.s || prodInfo.subst || '') : '';
+
+      // Verifica se o item já foi lido antes nesta sessão
+      var itemExistente = ITENS_ESCANEADOS.find(function(it) { return it.ean === ean; });
+      if (itemExistente) {
+        itemExistente.quantidadeNumero = (itemExistente.quantidadeNumero || 1) + 1;
+        itemExistente.quantidade = itemExistente.quantidadeNumero + ' un';
+      } else {
+        ITENS_ESCANEADOS.push({
+          id: new Date().getTime() + Math.floor(Math.random() * 1000),
+          ean: ean,
+          produto: nomeProd,
+          marca: marca,
+          volume: apres,
+          registro: reg,
+          substancia: subst,
+          quantidadeNumero: 1,
+          quantidade: '1 un',
+          motivo: 'Comércio irregular'
+        });
+      }
+
+      renderizarListaItens();
+      sincronizarComJanelaPrincipal();
+    }
+
+    // ─── RENDERIZAÇÃO VISUAL DA LISTA NO SCANNER ───
+    function renderizarListaItens() {
+      var container = document.getElementById('listaItensScaneados');
+      var lblTitulo = document.getElementById('lblTituloLista');
+      var btnTexto = document.getElementById('btnConcluirTexto');
+
+      if (!container) return;
+
+      var totalItens = ITENS_ESCANEADOS.length;
+      var totalVolumes = ITENS_ESCANEADOS.reduce(function(acc, it) { return acc + (it.quantidadeNumero || 1); }, 0);
+
+      if (lblTitulo) {
+        lblTitulo.innerHTML = '<i class="material-icons tiny left" style="vertical-align: middle;">shopping_cart</i>' +
+                              totalItens + ' item(ns) | ' + totalVolumes + ' vol.';
+      }
+
+      if (btnTexto) {
+        btnTexto.innerText = totalItens > 0 ? ('ADICIONAR ' + totalItens + ' PRODUTO(S) AO AUTO') : 'CONCLUIR E VOLTAR';
+      }
+
+      if (totalItens === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #78909c; font-style: italic; padding: 20px 0; font-size: 0.82rem;">' +
+                              'Aponte a câmera para os códigos de barra dos medicamentos apreendidos...</div>';
+        return;
+      }
+
+      var html = '';
+      for (var i = ITENS_ESCANEADOS.length - 1; i >= 0; i--) { // Mostra o mais recente no topo
+        var it = ITENS_ESCANEADOS[i];
+        html += '<div class="scanned-item-row">' +
+          '<div class="scanned-item-info">' +
+            '<div class="scanned-item-name">' + escaparHtml(it.produto) + '</div>' +
+            '<div class="scanned-item-sub">' + escaparHtml(it.marca) + (it.volume ? (' · ' + escaparHtml(it.volume)) : '') + '</div>' +
+          '</div>' +
+          '<div class="scanned-item-ctrls">' +
+            '<button type="button" class="btn-qty" onclick="alterarQuantidade(' + it.id + ', -1)">-</button>' +
+            '<span class="item-qty-val">' + (it.quantidadeNumero || 1) + '</span>' +
+            '<button type="button" class="btn-qty" onclick="alterarQuantidade(' + it.id + ', 1)">+</button>' +
+            '<button type="button" class="btn-flat red-text text-lighten-2" style="padding: 0 4px; height: 26px; line-height: 26px; margin-left: 2px;" onclick="removerItem(' + it.id + ')">' +
+              '<i class="material-icons tiny">delete</i>' +
+            '</button>' +
+          '</div>' +
+        '</div>';
+      }
+      container.innerHTML = html;
+    }
+
+    function alterarQuantidade(idItem, delta) {
+      var it = ITENS_ESCANEADOS.find(function(x) { return x.id === idItem; });
+      if (!it) return;
+      var novaQtd = (it.quantidadeNumero || 1) + delta;
+      if (novaQtd <= 0) {
+        removerItem(idItem);
+        return;
+      }
+      it.quantidadeNumero = novaQtd;
+      it.quantidade = novaQtd + ' un';
+      renderizarListaItens();
+      sincronizarComJanelaPrincipal();
+    }
+
+    function removerItem(idItem) {
+      ITENS_ESCANEADOS = ITENS_ESCANEADOS.filter(function(x) { return x.id !== idItem; });
+      renderizarListaItens();
+      sincronizarComJanelaPrincipal();
+    }
+
+    function escaparHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, function(m) {
+        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m];
+      });
+    }
+
+    // ─── SINCRONIZAÇÃO EM TEMPO REAL COM A TELA DO AUTO ───
+    function sincronizarComJanelaPrincipal() {
+      var payload = {
+        sistema: 'AMVS_DIGITAL',
+        tipo: 'AMVS_PRODUTOS_ATUALIZADOS',
+        itens: ITENS_ESCANEADOS,
+        timestamp: Date.now()
+      };
+
+      // 1. PostMessage para o opener (Janela do Sistema AMVS)
+      if (window.opener && !window.opener.closed) {
+        try {
+          window.opener.postMessage(payload, '*');
+        } catch(e) {}
+      }
+
+      // 2. LocalStorage para sincronização resiliente entre abas
       try {
-        localStorage.setItem('amvs_scan_resultado', JSON.stringify({
-          codigo: codigo,
-          timestamp: Date.now()
-        }));
+        localStorage.setItem('amvs_autos_itens_temp', JSON.stringify(payload));
       } catch(e) {}
 
-      // 3. Notifica via BroadcastChannel se suportado
+      // 3. BroadcastChannel para comunicação direta
       if (typeof BroadcastChannel !== 'undefined') {
         try {
           var bc = new BroadcastChannel('amvs_scanner_channel');
-          bc.postMessage({ codigo: codigo, timestamp: Date.now() });
+          bc.postMessage(payload);
           bc.close();
         } catch(e) {}
       }
     }
 
-    function aoDetectarCodigo(decodedText, decodedResult) {
-      var codigoLimpo = String(decodedText).trim();
-      if (!codigoLimpo) return;
-
-      // Evita disparos repetidos do mesmo código num intervalo de 2 segundos
-      if (codigoLimpo === ultimoCodigo) return;
-      ultimoCodigo = codigoLimpo;
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(function() { ultimoCodigo = ''; }, 2200);
-
-      totalLidos++;
-      tocarBeep();
-
-      var elStatus = document.getElementById('lblStatus');
-      elStatus.className = 'scanner-status sucesso';
-      elStatus.innerHTML = '✅ Código Lido: <b>' + codigoLimpo + '</b>';
-
-      document.getElementById('badgeContador').innerText = totalLidos + ' lido(s)';
-
-      enviarCodigoAoSistema(codigoLimpo);
-
-      var isContinuo = document.getElementById('chkContinuo').checked;
-      if (!isContinuo) {
-        setTimeout(function() {
-          concluirScanner();
-        }, 900);
-      } else {
-        setTimeout(function() {
-          if (elStatus.className.indexOf('sucesso') !== -1) {
-            elStatus.className = 'scanner-status';
-            elStatus.innerText = 'Aponte para o próximo produto...';
-          }
-        }, 1800);
-      }
-    }
-
+    // ─── CÂMERA AO VIVO ───
     function iniciarCamera() {
       html5QrCode = new Html5Qrcode("reader");
       var config = {
         fps: 15,
-        qrbox: { width: 320, height: 180 },
+        qrbox: { width: 320, height: 160 },
         aspectRatio: 1.777778,
         experimentalFeatures: {
           useBarCodeDetectorIfSupported: true
@@ -236,15 +417,13 @@
         { facingMode: "environment" },
         config,
         aoDetectarCodigo,
-        function(errorMessage) {
-          // Ignora falhas de frame sem leitura
-        }
+        function() {} // ignora frames vazios
       ).catch(function(err) {
-        console.error("Erro ao iniciar câmera:", err);
-        var elStatus = document.getElementById('lblStatus');
-        elStatus.className = 'scanner-status';
-        elStatus.style.color = '#ff5252';
-        elStatus.innerText = 'Falha ao acessar a câmera: ' + (err.message || err);
+        console.error("Erro câmera:", err);
+        var msg = document.getElementById('msgListaVazia');
+        if (msg) {
+          msg.innerHTML = '<span style="color:#ff5252;">Acesso à câmera não liberado. Permita o uso da câmera nas configurações do navegador.</span>';
+        }
       });
     }
 
@@ -266,12 +445,12 @@
           }
         }).catch(function() {
           torchAtivo = !torchAtivo;
-          M.toast({ html: 'Lanterna indisponível neste aparelho.', classes: 'grey darken-3' });
         });
       } catch(e) {}
     }
 
-    function concluirScanner() {
+    function concluirEFechar() {
+      sincronizarComJanelaPrincipal();
       if (html5QrCode) {
         html5QrCode.stop().then(function() {
           window.close();
@@ -284,6 +463,7 @@
     }
 
     window.addEventListener('DOMContentLoaded', function() {
+      carregarBaseCmedLocal();
       iniciarCamera();
     });
   </script>
