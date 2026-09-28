@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Scanner de Código de Barras - AMVS Digital</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body, html { width: 100%; height: 100%; background: #0a0e1a; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+    
+    .scanner-header {
+      position: fixed; top: 0; left: 0; right: 0; height: 56px;
+      background: rgba(10, 14, 26, 0.92); backdrop-filter: blur(8px);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 16px; z-index: 100; border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .scanner-header-title {
+      font-size: 1.05rem; font-weight: 700; color: #e8eaf6; display: flex; align-items: center; gap: 8px;
+    }
+    
+    #reader-container {
+      position: fixed; top: 56px; bottom: 120px; left: 0; right: 0;
+      display: flex; align-items: center; justify-content: center; background: #000;
+    }
+    #reader {
+      width: 100% !important; height: 100% !important; border: none !important;
+    }
+    #reader video {
+      object-fit: cover !important; width: 100% !important; height: 100% !important;
+    }
+
+    /* Retículo / Mira de Leitura */
+    .reticulo-overlay {
+      position: absolute; width: 82%; max-width: 380px; height: 210px;
+      border: 2px solid rgba(255, 255, 255, 0.4); border-radius: 12px;
+      pointer-events: none; z-index: 50; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+      display: flex; flex-direction: column; justify-content: space-between; padding: 6px;
+    }
+    .reticulo-canto-tl { width: 22px; height: 22px; border-top: 4px solid #00e676; border-left: 4px solid #00e676; border-radius: 4px 0 0 0; }
+    .reticulo-canto-tr { width: 22px; height: 22px; border-top: 4px solid #00e676; border-right: 4px solid #00e676; border-radius: 0 4px 0 0; align-self: flex-end; }
+    .reticulo-canto-bl { width: 22px; height: 22px; border-bottom: 4px solid #00e676; border-left: 4px solid #00e676; border-radius: 0 0 0 4px; }
+    .reticulo-canto-br { width: 22px; height: 22px; border-bottom: 4px solid #00e676; border-right: 4px solid #00e676; border-radius: 0 0 4px 0; align-self: flex-end; }
+    
+    .linha-laser {
+      position: absolute; top: 10%; left: 5%; width: 90%; height: 2px;
+      background: linear-gradient(90deg, transparent, #00e676, transparent);
+      box-shadow: 0 0 10px #00e676;
+      animation: laserScan 2s infinite ease-in-out;
+    }
+    @keyframes laserScan {
+      0%, 100% { top: 12%; opacity: 0.3; }
+      50% { top: 88%; opacity: 1; }
+    }
+
+    /* Rodapé com Controles e Último Item */
+    .scanner-footer {
+      position: fixed; bottom: 0; left: 0; right: 0; height: 120px;
+      background: rgba(10, 14, 26, 0.95); backdrop-filter: blur(8px);
+      padding: 12px 16px; z-index: 100; border-top: 1px solid rgba(255,255,255,0.1);
+      display: flex; flex-direction: column; justify-content: space-between;
+    }
+    .scanner-status {
+      text-align: center; font-size: 0.85rem; color: #b0bec5;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .scanner-status.sucesso {
+      color: #00e676; font-weight: 700; font-size: 0.95rem;
+    }
+    .scanner-acoes {
+      display: flex; gap: 10px; align-items: center; justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- CABEÇALHO -->
+  <div class="scanner-header">
+    <div class="scanner-header-title">
+      <i class="material-icons" style="color: #00e676;">qr_code_scanner</i>
+      <span>Scanner AMVS Digital</span>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button id="btnTorch" onclick="alternarLanterna()" class="btn-floating btn-small grey darken-3 waves-effect" title="Lanterna">
+        <i class="material-icons" id="iconTorch">flash_on</i>
+      </button>
+      <button onclick="concluirScanner()" class="btn-floating btn-small red darken-3 waves-effect" title="Fechar">
+        <i class="material-icons">close</i>
+      </button>
+    </div>
+  </div>
+
+  <!-- ÁREA DE VÍDEO DO SCANNER -->
+  <div id="reader-container">
+    <div id="reader"></div>
+    <div class="reticulo-overlay">
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <div class="reticulo-canto-tl"></div>
+        <div class="reticulo-canto-tr"></div>
+      </div>
+      <div class="linha-laser"></div>
+      <div style="display: flex; justify-content: space-between; width: 100%;">
+        <div class="reticulo-canto-bl"></div>
+        <div class="reticulo-canto-br"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RODAPÉ -->
+  <div class="scanner-footer">
+    <div id="lblStatus" class="scanner-status">
+      Aponte a câmera para o código de barras (EAN-13, QR Code)
+    </div>
+    
+    <div class="scanner-acoes">
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <label style="cursor: pointer; display: flex; align-items: center; gap: 6px; color: #cfd8dc; font-size: 0.8rem;">
+          <input type="checkbox" id="chkContinuo" class="filled-in" checked />
+          <span>Leitura Contínua</span>
+        </label>
+      </div>
+
+      <div style="display: flex; gap: 8px;">
+        <span id="badgeContador" class="chip grey darken-3 white-text" style="font-size: 0.8rem; height: 32px; line-height: 32px; margin: 0;">
+          0 lido(s)
+        </span>
+        <button onclick="concluirScanner()" class="btn-small green darken-2 waves-effect" style="border-radius: 20px; font-weight: bold;">
+          <i class="material-icons left tiny">check</i>Concluir
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var html5QrCode = null;
+    var totalLidos = 0;
+    var ultimoCodigo = '';
+    var debounceTimer = null;
+    var torchAtivo = false;
+
+    function tocarBeep() {
+      try {
+        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1200, ctx.currentTime);
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.13);
+      } catch(e) {}
+      if (navigator.vibrate) navigator.vibrate(100);
+    }
+
+    function enviarCodigoAoSistema(codigo) {
+      // 1. Envia via postMessage para o opener (App AMVS)
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage({
+          sistema: 'AMVS_DIGITAL',
+          tipo: 'AMVS_BARCODE_ESCANEADO',
+          codigo: codigo
+        }, '*');
+      }
+
+      // 2. Persiste em localStorage para redundância
+      try {
+        localStorage.setItem('amvs_scan_resultado', JSON.stringify({
+          codigo: codigo,
+          timestamp: Date.now()
+        }));
+      } catch(e) {}
+
+      // 3. Notifica via BroadcastChannel se suportado
+      if (typeof BroadcastChannel !== 'undefined') {
+        try {
+          var bc = new BroadcastChannel('amvs_scanner_channel');
+          bc.postMessage({ codigo: codigo, timestamp: Date.now() });
+          bc.close();
+        } catch(e) {}
+      }
+    }
+
+    function aoDetectarCodigo(decodedText, decodedResult) {
+      var codigoLimpo = String(decodedText).trim();
+      if (!codigoLimpo) return;
+
+      // Evita disparos repetidos do mesmo código num intervalo de 2 segundos
+      if (codigoLimpo === ultimoCodigo) return;
+      ultimoCodigo = codigoLimpo;
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(function() { ultimoCodigo = ''; }, 2200);
+
+      totalLidos++;
+      tocarBeep();
+
+      var elStatus = document.getElementById('lblStatus');
+      elStatus.className = 'scanner-status sucesso';
+      elStatus.innerHTML = '✅ Código Lido: <b>' + codigoLimpo + '</b>';
+
+      document.getElementById('badgeContador').innerText = totalLidos + ' lido(s)';
+
+      enviarCodigoAoSistema(codigoLimpo);
+
+      var isContinuo = document.getElementById('chkContinuo').checked;
+      if (!isContinuo) {
+        setTimeout(function() {
+          concluirScanner();
+        }, 900);
+      } else {
+        setTimeout(function() {
+          if (elStatus.className.indexOf('sucesso') !== -1) {
+            elStatus.className = 'scanner-status';
+            elStatus.innerText = 'Aponte para o próximo produto...';
+          }
+        }, 1800);
+      }
+    }
+
+    function iniciarCamera() {
+      html5QrCode = new Html5Qrcode("reader");
+      var config = {
+        fps: 15,
+        qrbox: { width: 320, height: 180 },
+        aspectRatio: 1.777778,
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true
+        }
+      };
+
+      html5QrCode.start(
+        { facingMode: "environment" },
+        config,
+        aoDetectarCodigo,
+        function(errorMessage) {
+          // Ignora falhas de frame sem leitura
+        }
+      ).catch(function(err) {
+        console.error("Erro ao iniciar câmera:", err);
+        var elStatus = document.getElementById('lblStatus');
+        elStatus.className = 'scanner-status';
+        elStatus.style.color = '#ff5252';
+        elStatus.innerText = 'Falha ao acessar a câmera: ' + (err.message || err);
+      });
+    }
+
+    function alternarLanterna() {
+      if (!html5QrCode) return;
+      try {
+        torchAtivo = !torchAtivo;
+        html5QrCode.applyVideoConstraints({
+          advanced: [{ torch: torchAtivo }]
+        }).then(function() {
+          var btn = document.getElementById('btnTorch');
+          var icon = document.getElementById('iconTorch');
+          if (torchAtivo) {
+            btn.className = 'btn-floating btn-small amber darken-2 waves-effect';
+            icon.innerText = 'flash_on';
+          } else {
+            btn.className = 'btn-floating btn-small grey darken-3 waves-effect';
+            icon.innerText = 'flash_off';
+          }
+        }).catch(function() {
+          torchAtivo = !torchAtivo;
+          M.toast({ html: 'Lanterna indisponível neste aparelho.', classes: 'grey darken-3' });
+        });
+      } catch(e) {}
+    }
+
+    function concluirScanner() {
+      if (html5QrCode) {
+        html5QrCode.stop().then(function() {
+          window.close();
+        }).catch(function() {
+          window.close();
+        });
+      } else {
+        window.close();
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', function() {
+      iniciarCamera();
+    });
+  </script>
+</body>
+</html>
