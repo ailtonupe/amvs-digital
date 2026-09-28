@@ -18,17 +18,39 @@
     /* CABEÇALHO SUPERIOR */
     .scanner-header {
       position: fixed; top: 0; left: 0; right: 0; height: 50px;
-      background: rgba(10, 14, 26, 0.96); backdrop-filter: blur(8px);
+      background: rgba(10, 14, 26, 0.98); backdrop-filter: blur(8px);
       display: flex; align-items: center; justify-content: space-between;
       padding: 0 14px; z-index: 100; border-bottom: 1px solid rgba(255,255,255,0.12);
     }
     .scanner-header-title {
       font-size: 0.95rem; font-weight: 700; color: #e8eaf6; display: flex; align-items: center; gap: 8px;
     }
+
+    /* BARRA DE MOTIVO DA APREENSÃO / SEPARAÇÃO POR GRUPOS */
+    .scanner-motivo-bar {
+      position: fixed; top: 50px; left: 0; right: 0; height: 44px;
+      background: #111827; border-bottom: 1px solid rgba(255,255,255,0.12);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 10px; z-index: 95; gap: 8px;
+    }
+    .motivo-selector-wrapper {
+      display: flex; align-items: center; gap: 6px; flex: 1; overflow: hidden;
+    }
+    .motivo-select {
+      background: #1f2937; color: #ffd54f; border: 1px solid #4b5563;
+      border-radius: 4px; padding: 2px 6px; font-size: 0.8rem; font-weight: 700;
+      height: 32px; outline: none; cursor: pointer; flex: 1; min-width: 140px;
+    }
+    .btn-novo-manual {
+      background: #00e676; color: #0a0e1a; border: none; border-radius: 4px;
+      padding: 5px 10px; font-size: 0.75rem; font-weight: 700;
+      display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap;
+    }
+    .btn-novo-manual:active { background: #00c853; }
     
     /* ÁREA DA CÂMERA */
     #reader-container {
-      position: fixed; top: 50px; bottom: 230px; left: 0; right: 0;
+      position: fixed; top: 94px; bottom: 235px; left: 0; right: 0;
       display: flex; align-items: center; justify-content: center; background: #000;
     }
     #reader {
@@ -63,16 +85,16 @@
 
     /* PAINEL INFERIOR: CARRINHO DE ITENS ESCANEADOS */
     .scanner-drawer {
-      position: fixed; bottom: 0; left: 0; right: 0; height: 230px;
+      position: fixed; bottom: 0; left: 0; right: 0; height: 235px;
       background: #141b2d; border-top: 2px solid #00e676;
       z-index: 100; display: flex; flex-direction: column; box-shadow: 0 -4px 16px rgba(0,0,0,0.5);
     }
     .scanner-drawer-header {
-      padding: 8px 14px; background: #1a233a; display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px; background: #1a233a; display: flex; align-items: center; justify-content: space-between;
       border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 0.85rem; font-weight: 700; color: #b0bec5;
     }
     .scanner-drawer-list {
-      flex: 1; overflow-y: auto; padding: 6px 12px;
+      flex: 1; overflow-y: auto; padding: 6px 10px;
     }
     .scanned-item-row {
       display: flex; align-items: center; justify-content: space-between;
@@ -86,18 +108,22 @@
       font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .scanned-item-sub {
-      font-size: 0.72rem; color: #90a4ae; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      font-size: 0.72rem; color: #90a4ae; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;
+    }
+    .badge-motivo-item {
+      display: inline-block; font-size: 0.65rem; padding: 1px 6px; border-radius: 3px; font-weight: 600;
+      margin-top: 3px; text-transform: uppercase; letter-spacing: 0.3px;
     }
     .scanned-item-ctrls {
-      display: flex; align-items: center; gap: 4px;
+      display: flex; align-items: center; gap: 3px;
     }
     .btn-qty {
-      width: 28px; height: 28px; line-height: 28px; text-align: center; border-radius: 4px;
-      background: #2a3b5c; color: #fff; cursor: pointer; font-weight: bold; border: none; font-size: 1rem;
+      width: 26px; height: 26px; line-height: 26px; text-align: center; border-radius: 4px;
+      background: #2a3b5c; color: #fff; cursor: pointer; font-weight: bold; border: none; font-size: 0.95rem;
     }
     .btn-qty:active { background: #394f7c; }
     .item-qty-val {
-      min-width: 26px; text-align: center; font-weight: 700; color: #00e676; font-size: 0.95rem;
+      min-width: 24px; text-align: center; font-weight: 700; color: #00e676; font-size: 0.92rem;
     }
     
     /* BARRA DE AÇÃO FINAL */
@@ -110,6 +136,41 @@
       background: rgba(0, 230, 118, 0.28); pointer-events: none; z-index: 60;
       opacity: 0; transition: opacity 0.15s ease-out;
     }
+
+    /* MODAL DE EDIÇÃO E CADASTRO MANUAL */
+    .modal-custom-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.85); backdrop-filter: blur(4px);
+      z-index: 300; display: flex; align-items: center; justify-content: center; padding: 14px;
+    }
+    .modal-custom-card {
+      background: #141b2d; border: 1px solid #00e676; border-radius: 10px;
+      width: 100%; max-width: 440px; max-height: 92vh; overflow-y: auto; padding: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.7); display: flex; flex-direction: column; gap: 10px;
+    }
+    .modal-custom-header {
+      display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;
+    }
+    .modal-field {
+      display: flex; flex-direction: column; gap: 3px;
+    }
+    .modal-field label {
+      font-size: 0.73rem; color: #b0bec5; font-weight: 600; text-transform: uppercase;
+    }
+    .modal-field input, .modal-field select {
+      background: #0a0e1a !important; color: #fff !important; border: 1px solid #37474f !important;
+      border-radius: 4px !important; padding: 0 8px !important; height: 38px !important; font-size: 0.88rem !important; margin: 0 !important;
+    }
+    .modal-field input:focus, .modal-field select:focus {
+      border-color: #00e676 !important; box-shadow: 0 0 6px rgba(0,230,118,0.4) !important;
+    }
+    .btn-preset {
+      background: #1e293b; color: #94a3b8; border: 1px solid #334155; border-radius: 12px;
+      padding: 3px 8px; font-size: 0.68rem; font-weight: 600; cursor: pointer; transition: background 0.15s;
+    }
+    .btn-preset:active { background: #334155; }
+    .btn-preset.red-preset { border-color: #ef5350; color: #ef5350; }
+    .btn-preset.green-preset { border-color: #66bb6a; color: #66bb6a; }
   </style>
 </head>
 <body>
@@ -117,7 +178,7 @@
   <!-- FLASH VISUAL VERDE AO ESCANEAR -->
   <div id="flashOverlay" class="scanner-flash-success"></div>
 
-  <!-- CABEÇALHO -->
+  <!-- CABEÇALHO SUPERIOR -->
   <div class="scanner-header">
     <div class="scanner-header-title">
       <i class="material-icons" style="color: #00e676; font-size: 1.3rem;">qr_code_scanner</i>
@@ -131,6 +192,26 @@
         <i class="material-icons" style="font-size: 1.1rem;">close</i>
       </button>
     </div>
+  </div>
+
+  <!-- BARRA DE SELEÇÃO PRÉVIA DE MOTIVO (SEPARAÇÃO POR GRUPOS) -->
+  <div class="scanner-motivo-bar">
+    <div class="motivo-selector-wrapper">
+      <i class="material-icons tiny" style="color: #ffd54f;">gavel</i>
+      <span style="font-size: 0.74rem; color: #ffd54f; font-weight: bold; white-space: nowrap;">Grupo:</span>
+      <select id="selMotivoScanner" class="browser-default motivo-select" onchange="aoMudarMotivoScanner(this.value)">
+        <option value="Prazo de validade expirado">Validade expirada</option>
+        <option value="Comércio irregular" selected>Comércio irregular</option>
+        <option value="Sem registro sanitário na Anvisa">Sem registro Anvisa</option>
+        <option value="Origem clandestina / Falsificação">Clandestino / Falsificação</option>
+        <option value="Embalagem violada / avariada">Embalagem avariada</option>
+        <option value="Armazenamento em temperatura inadequada">Temperatura inadequada</option>
+        <option value="Outro motivo">Outro motivo</option>
+      </select>
+    </div>
+    <button type="button" onclick="abrirModalProdutoManual('')" class="btn-novo-manual" title="Cadastrar item sem código de barras ou outro gênero (Whey, chocolate, clandestino)">
+      <i class="material-icons tiny">add</i><span>Outro Item</span>
+    </button>
   </div>
 
   <!-- ÁREA DE VÍDEO DO SCANNER -->
@@ -158,7 +239,7 @@
 
     <div class="scanner-drawer-list" id="listaItensScaneados">
       <div id="msgListaVazia" style="text-align: center; color: #78909c; font-style: italic; padding: 22px 0; font-size: 0.84rem;">
-        Aponte a câmera para os códigos de barra dos medicamentos apreendidos...
+        Aponte a câmera para os códigos de barra dos produtos apreendidos...
       </div>
     </div>
 
@@ -168,6 +249,86 @@
         <i class="material-icons">check_circle</i>
         <span id="btnConcluirTexto">CONCLUIR E ADICIONAR AO AUTO</span>
       </button>
+    </div>
+  </div>
+
+  <!-- MODAL DE EDIÇÃO / ADIÇÃO MANUAL DE PRODUTOS (WHEY, CHOCOLATE, FALSO MOUNJARO, ETC.) -->
+  <div id="modalItemOverlay" class="modal-custom-overlay" style="display:none;">
+    <div class="modal-custom-card">
+      <div class="modal-custom-header">
+        <span id="modalItemTitulo" style="font-weight:700; font-size:0.95rem; color:#00e676; display:flex; align-items:center; gap:6px;">
+          <i class="material-icons tiny">edit</i><span>Editar Item</span>
+        </span>
+        <button type="button" onclick="fecharModalItem()" class="btn-flat white-text" style="padding:0; height:32px; line-height:32px; min-width:32px;">
+          <i class="material-icons">close</i>
+        </button>
+      </div>
+
+      <!-- PRESETS RÁPIDOS PARA NÃO-MEDICAMENTOS E CLANDESTINOS -->
+      <div id="modalItemPresets" style="display:flex; flex-direction:column; gap:4px;">
+        <span style="font-size:0.7rem; color:#90a4ae; font-weight:600;">Preenchimento rápido:</span>
+        <div style="display:flex; flex-wrap:wrap; gap:5px;">
+          <button type="button" class="btn-preset green-preset" onclick="aplicarPresetModal('whey')">🥤 Whey/Suplemento</button>
+          <button type="button" class="btn-preset" onclick="aplicarPresetModal('chocolate')">🍫 Alimento/Chocolate</button>
+          <button type="button" class="btn-preset red-preset" onclick="aplicarPresetModal('mounjaro')">⚠️ Falso Mounjaro</button>
+          <button type="button" class="btn-preset" onclick="aplicarPresetModal('cosmetico')">🧴 Cosmético</button>
+          <button type="button" class="btn-preset red-preset" onclick="aplicarPresetModal('anabolizante')">💉 Clandestino</button>
+        </div>
+      </div>
+
+      <input type="hidden" id="modal_item_id">
+      <input type="hidden" id="modal_item_ean">
+
+      <div class="modal-field">
+        <label>Nome do Produto / Descrição *</label>
+        <input type="text" id="modal_item_nome" placeholder="Ex: Whey Protein 100% 900g, Falso Mounjaro...">
+      </div>
+
+      <div style="display:flex; gap:8px;">
+        <div class="modal-field" style="flex:1;">
+          <label>Marca / Fabricante</label>
+          <input type="text" id="modal_item_marca" placeholder="Ex: Max Titanium, Clandestino, Nestlé...">
+        </div>
+        <div class="modal-field" style="width:115px;">
+          <label>Vol. / Apresentação</label>
+          <input type="text" id="modal_item_vol" placeholder="Ex: 900g, 80g, 15mg">
+        </div>
+      </div>
+
+      <div style="display:flex; gap:8px; align-items:center;">
+        <div class="modal-field" style="width:125px;">
+          <label>Quantidade *</label>
+          <div style="display:flex; align-items:center; gap:4px;">
+            <button type="button" class="btn-qty" onclick="ajustarQtdModal(-1)">-</button>
+            <input type="number" id="modal_item_qtd" min="1" value="1" style="text-align:center; font-weight:bold; color:#00e676;">
+            <button type="button" class="btn-qty" onclick="ajustarQtdModal(1)">+</button>
+          </div>
+        </div>
+        <div class="modal-field" style="flex:1;">
+          <label>Unidade</label>
+          <input type="text" id="modal_item_unidade" value="un" placeholder="un, potes, caixas, frascos">
+        </div>
+      </div>
+
+      <div class="modal-field">
+        <label>Motivo da Apreensão *</label>
+        <select id="modal_item_motivo" class="browser-default motivo-select" style="width:100%; height:38px;">
+          <option value="Prazo de validade expirado">Prazo de validade expirado</option>
+          <option value="Comércio irregular">Comércio irregular</option>
+          <option value="Sem registro sanitário na Anvisa">Sem registro sanitário na Anvisa</option>
+          <option value="Origem clandestina / Falsificação">Origem clandestina / Falsificação</option>
+          <option value="Embalagem violada / avariada">Embalagem violada / avariada</option>
+          <option value="Armazenamento em temperatura inadequada">Armazenamento em temperatura inadequada</option>
+          <option value="Outro motivo">Outro motivo</option>
+        </select>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:6px; border-top:1px solid rgba(255,255,255,0.08); padding-top:10px;">
+        <button type="button" onclick="fecharModalItem()" class="btn-flat grey-text text-lighten-1" style="text-transform:none; font-weight:600;">Cancelar</button>
+        <button type="button" onclick="salvarModalItem()" class="btn waves-effect waves-light green darken-2" style="text-transform:none; font-weight:700; border-radius:6px; padding:0 16px;">
+          <i class="material-icons left tiny">check</i>Salvar Item
+        </button>
+      </div>
     </div>
   </div>
 
@@ -191,7 +352,6 @@
     document.addEventListener('click', destravarAudio);
 
     function emitirBeepSucesso() {
-      // 1. Áudio WebAudio com tratamento de parâmetros estrito
       try {
         var AudioCtxClass = window.AudioContext || window.webkitAudioContext;
         if (AudioCtxClass) {
@@ -213,12 +373,10 @@
         console.warn('[Beep]', eAudio);
       }
 
-      // 2. Vibração física no aparelho
       try {
         if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
       } catch(eVib) {}
 
-      // 3. Flash visual verde na tela
       try {
         var fl = document.getElementById('flashOverlay');
         if (fl) {
@@ -228,13 +386,64 @@
       } catch(eFl) {}
     }
 
-    // ─── BASE CMED EM MEMÓRIA LOCAL (BUSCA EM 0 MILISSEGUNDOS) ───
+    // ─── ESTADO DO SCANNER & BASE CMED ───
     var BASE_CMED = {};
     var ITENS_ESCANEADOS = [];
+    var CACHE_EAN_MANUAL = {}; // Memória para produtos de outros gêneros escaneados nesta sessão
+    var MOTIVO_PADRAO_SCANNER = 'Comércio irregular';
     var ultimoCodigo = '';
     var debounceTimer = null;
     var html5QrCode = null;
     var torchAtivo = false;
+    var cameraPausada = false;
+
+    // Altera motivo padrão selecionado pelo fiscal (Separação por Grupos)
+    function aoMudarMotivoScanner(novoMotivo) {
+      if (novoMotivo) {
+        MOTIVO_PADRAO_SCANNER = novoMotivo;
+        try {
+          localStorage.setItem('amvs_scanner_motivo_inicial', novoMotivo);
+        } catch(e) {}
+      }
+    }
+
+    // Carrega itens pré-existentes passados pela tela principal do Auto
+    function inicializarItensPreExistentes() {
+      try {
+        // Carrega motivo inicial se houver
+        var motSalvo = localStorage.getItem('amvs_scanner_motivo_inicial');
+        if (motSalvo) {
+          MOTIVO_PADRAO_SCANNER = motSalvo;
+          var selM = document.getElementById('selMotivoScanner');
+          if (selM) selM.value = motSalvo;
+        }
+
+        // Carrega itens que já estavam na lista do Auto
+        var rawItens = localStorage.getItem('amvs_scanner_itens_iniciais');
+        if (rawItens) {
+          var lista = JSON.parse(rawItens);
+          if (Array.isArray(lista) && lista.length > 0) {
+            ITENS_ESCANEADOS = lista.map(function(it) {
+              var qNum = parseInt(String(it.quantidade || '1').replace(/\D/g, ''), 10) || 1;
+              return {
+                id: it.id || (new Date().getTime() + Math.floor(Math.random() * 1000)),
+                ean: it.ean || '',
+                produto: it.produto || '',
+                marca: it.marca || '---',
+                volume: it.volume || '',
+                registro: it.registro || '',
+                quantidadeNumero: qNum,
+                quantidade: it.quantidade || (qNum + ' un'),
+                motivo: it.motivo || MOTIVO_PADRAO_SCANNER
+              };
+            });
+            renderizarListaItens();
+          }
+        }
+      } catch(e) {
+        console.warn('[inicializarItensPreExistentes] Aviso:', e);
+      }
+    }
 
     function carregarBaseCmedLocal() {
       var elStatus = document.getElementById('lblBaseCmedStatus');
@@ -256,40 +465,46 @@
 
     // ─── PROCESSAMENTO DO CÓDIGO DETECTADO ───
     function aoDetectarCodigo(decodedText) {
+      if (cameraPausada) return;
+
       try {
         var ean = String(decodedText || '').trim();
         if (!ean) return;
 
-        // Evita leitura repetida em menos de 1.3s
+        // Evita leitura repetida em menos de 1.2s
         if (ean === ultimoCodigo) return;
         ultimoCodigo = ean;
         if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(function() { ultimoCodigo = ''; }, 1300);
+        debounceTimer = setTimeout(function() { ultimoCodigo = ''; }, 1200);
 
-        // Beep seguro
-        emitirBeepSucesso();
-
-        // Busca dados no CMED ou gera fallback
-        var prodInfo = BASE_CMED ? BASE_CMED[ean] : null;
-        var nomeProd = prodInfo ? (prodInfo.p || prodInfo.prod || 'Medicamento') : ('Medicamento ' + ean);
-        var marca = prodInfo ? (prodInfo.m || prodInfo.lab || '---') : '---';
-        var apres = prodInfo ? (prodInfo.a || prodInfo.apres || '') : '';
-        var reg = prodInfo ? (prodInfo.r || prodInfo.reg || '') : '';
-        var subst = prodInfo ? (prodInfo.s || prodInfo.subst || '') : '';
-
-        // Procura se já está na lista acumulada
+        // 1. Procura se este EAN já está na lista atual
         var itemExistente = null;
         for (var i = 0; i < ITENS_ESCANEADOS.length; i++) {
-          if (ITENS_ESCANEADOS[i].ean === ean) {
+          if (ITENS_ESCANEADOS[i].ean && ITENS_ESCANEADOS[i].ean === ean) {
             itemExistente = ITENS_ESCANEADOS[i];
             break;
           }
         }
 
         if (itemExistente) {
+          emitirBeepSucesso();
           itemExistente.quantidadeNumero = (itemExistente.quantidadeNumero || 1) + 1;
-          itemExistente.quantidade = itemExistente.quantidadeNumero + ' un';
-        } else {
+          var unid = itemExistente.quantidade.replace(/^[0-9\s]+/, '').trim() || 'un';
+          itemExistente.quantidade = itemExistente.quantidadeNumero + ' ' + unid;
+          renderizarListaItens();
+          sincronizarComJanelaPrincipal(true);
+          return;
+        }
+
+        // 2. Busca dados no CMED Anvisa
+        var prodInfo = BASE_CMED ? BASE_CMED[ean] : null;
+        if (prodInfo) {
+          emitirBeepSucesso();
+          var nomeProd = prodInfo.p || prodInfo.prod || ('Medicamento ' + ean);
+          var marca = prodInfo.m || prodInfo.lab || '---';
+          var apres = prodInfo.a || prodInfo.apres || '';
+          var reg = prodInfo.r || prodInfo.reg || '';
+
           ITENS_ESCANEADOS.push({
             id: new Date().getTime() + Math.floor(Math.random() * 1000),
             ean: ean,
@@ -297,16 +512,39 @@
             marca: marca,
             volume: apres,
             registro: reg,
-            substancia: subst,
             quantidadeNumero: 1,
             quantidade: '1 un',
-            motivo: 'Comércio irregular'
+            motivo: MOTIVO_PADRAO_SCANNER
           });
+
+          renderizarListaItens();
+          sincronizarComJanelaPrincipal(true);
+          return;
         }
 
-        // Renderiza no carrinho do scanner e sincroniza com o sistema
-        renderizarListaItens();
-        sincronizarComJanelaPrincipal();
+        // 3. Procura no cache manual de outros gêneros (Whey, chocolate, etc.)
+        if (CACHE_EAN_MANUAL[ean]) {
+          emitirBeepSucesso();
+          var cm = CACHE_EAN_MANUAL[ean];
+          ITENS_ESCANEADOS.push({
+            id: new Date().getTime() + Math.floor(Math.random() * 1000),
+            ean: ean,
+            produto: cm.produto,
+            marca: cm.marca || '---',
+            volume: cm.volume || '',
+            registro: '',
+            quantidadeNumero: 1,
+            quantidade: '1 un',
+            motivo: MOTIVO_PADRAO_SCANNER
+          });
+          renderizarListaItens();
+          sincronizarComJanelaPrincipal(true);
+          return;
+        }
+
+        // 4. Código não cadastrado no CMED: pode ser Whey Protein, Alimento, Cosmético ou Clandestino
+        emitirBeepSucesso();
+        abrirModalProdutoManual(ean);
 
       } catch (errGeral) {
         console.error('[aoDetectarCodigo] Erro:', errGeral);
@@ -338,28 +576,45 @@
 
       if (totalItens === 0) {
         container.innerHTML = '<div style="text-align: center; color: #78909c; font-style: italic; padding: 22px 0; font-size: 0.84rem;">' +
-                              'Aponte a câmera para os códigos de barra dos medicamentos apreendidos...</div>';
+                              'Aponte a câmera para os códigos de barra dos produtos apreendidos...</div>';
         return;
       }
 
       var html = '';
-      for (var i = ITENS_ESCANEADOS.length - 1; i >= 0; i--) { // Mostra o mais recente no topo
+      for (var i = ITENS_ESCANEADOS.length - 1; i >= 0; i--) {
         var it = ITENS_ESCANEADOS[i];
-        var itemNome = it.produto || ('Produto ' + it.ean);
+        var itemNome = it.produto || (it.ean ? ('Produto ' + it.ean) : 'Item sem código');
         var itemMarca = it.marca || '---';
         var itemVol = it.volume ? (' · ' + it.volume) : '';
         var qtd = it.quantidadeNumero || 1;
+        var motivoTxt = it.motivo || MOTIVO_PADRAO_SCANNER;
+
+        // Cor do badge do motivo
+        var badgeCor = 'rgba(255, 179, 0, 0.2); color: #ffb300; border: 1px solid #ffb300;';
+        if (motivoTxt.indexOf('expirado') !== -1 || motivoTxt.indexOf('vencid') !== -1) {
+          badgeCor = 'rgba(239, 83, 80, 0.2); color: #ef5350; border: 1px solid #ef5350;';
+        } else if (motivoTxt.indexOf('clandestin') !== -1 || motivoTxt.indexOf('Falsific') !== -1) {
+          badgeCor = 'rgba(211, 47, 47, 0.25); color: #ff5252; border: 1px solid #ff5252;';
+        } else if (motivoTxt.indexOf('Sem registro') !== -1) {
+          badgeCor = 'rgba(171, 71, 188, 0.2); color: #ba68c8; border: 1px solid #ba68c8;';
+        } else if (motivoTxt.indexOf('temperatura') !== -1) {
+          badgeCor = 'rgba(38, 198, 218, 0.2); color: #26c6da; border: 1px solid #26c6da;';
+        }
 
         html += '<div class="scanned-item-row">' +
           '<div class="scanned-item-info">' +
             '<div class="scanned-item-name">' + escaparHtml(itemNome) + '</div>' +
             '<div class="scanned-item-sub">' + escaparHtml(itemMarca) + escaparHtml(itemVol) + '</div>' +
+            '<span class="badge-motivo-item" style="' + badgeCor + '">' + escaparHtml(motivoTxt) + '</span>' +
           '</div>' +
           '<div class="scanned-item-ctrls">' +
             '<button type="button" class="btn-qty" onclick="alterarQuantidade(' + it.id + ', -1)">-</button>' +
             '<span class="item-qty-val">' + qtd + '</span>' +
             '<button type="button" class="btn-qty" onclick="alterarQuantidade(' + it.id + ', 1)">+</button>' +
-            '<button type="button" class="btn-flat red-text text-lighten-2" style="padding: 0 4px; height: 28px; line-height: 28px; margin-left: 4px;" onclick="removerItem(' + it.id + ')">' +
+            '<button type="button" class="btn-flat amber-text text-lighten-2" style="padding: 0 4px; height: 26px; line-height: 26px; margin-left: 2px;" onclick="abrirModalEditarItem(' + it.id + ')" title="Editar dados">' +
+              '<i class="material-icons tiny">edit</i>' +
+            '</button>' +
+            '<button type="button" class="btn-flat red-text text-lighten-2" style="padding: 0 4px; height: 26px; line-height: 26px;" onclick="removerItem(' + it.id + ')" title="Remover">' +
               '<i class="material-icons tiny">delete</i>' +
             '</button>' +
           '</div>' +
@@ -376,19 +631,187 @@
             ITENS_ESCANEADOS.splice(i, 1);
           } else {
             ITENS_ESCANEADOS[i].quantidadeNumero = novaQtd;
-            ITENS_ESCANEADOS[i].quantidade = novaQtd + ' un';
+            var unid = ITENS_ESCANEADOS[i].quantidade.replace(/^[0-9\s]+/, '').trim() || 'un';
+            ITENS_ESCANEADOS[i].quantidade = novaQtd + ' ' + unid;
           }
           break;
         }
       }
       renderizarListaItens();
-      sincronizarComJanelaPrincipal();
+      sincronizarComJanelaPrincipal(true);
     }
 
     function removerItem(idItem) {
       ITENS_ESCANEADOS = ITENS_ESCANEADOS.filter(function(x) { return x.id !== idItem; });
       renderizarListaItens();
-      sincronizarComJanelaPrincipal();
+      sincronizarComJanelaPrincipal(true);
+    }
+
+    // ─── MODAL DE CADASTRO MANUAL / EDIÇÃO DE ITENS ───
+    function abrirModalProdutoManual(eanPrefill) {
+      cameraPausada = true;
+      var elOverlay = document.getElementById('modalItemOverlay');
+      var elTitulo = document.getElementById('modalItemTitulo');
+      var elPresets = document.getElementById('modalItemPresets');
+
+      document.getElementById('modal_item_id').value = '';
+      document.getElementById('modal_item_ean').value = eanPrefill || '';
+      document.getElementById('modal_item_nome').value = '';
+      document.getElementById('modal_item_marca').value = '';
+      document.getElementById('modal_item_vol').value = '';
+      document.getElementById('modal_item_qtd').value = '1';
+      document.getElementById('modal_item_unidade').value = 'un';
+      document.getElementById('modal_item_motivo').value = MOTIVO_PADRAO_SCANNER;
+
+      if (elPresets) elPresets.style.display = 'flex';
+
+      if (eanPrefill) {
+        elTitulo.innerHTML = '<i class="material-icons tiny">qr_code</i><span>Código ' + eanPrefill + ' não está na CMED</span>';
+      } else {
+        elTitulo.innerHTML = '<i class="material-icons tiny">add_circle</i><span>Cadastrar Outro Produto / Gênero</span>';
+      }
+
+      if (elOverlay) elOverlay.style.display = 'flex';
+      setTimeout(function() {
+        var elNome = document.getElementById('modal_item_nome');
+        if (elNome) elNome.focus();
+      }, 100);
+    }
+
+    function abrirModalEditarItem(idItem) {
+      cameraPausada = true;
+      var item = ITENS_ESCANEADOS.find(function(x) { return x.id === idItem; });
+      if (!item) return;
+
+      var elOverlay = document.getElementById('modalItemOverlay');
+      var elTitulo = document.getElementById('modalItemTitulo');
+      var elPresets = document.getElementById('modalItemPresets');
+
+      document.getElementById('modal_item_id').value = item.id;
+      document.getElementById('modal_item_ean').value = item.ean || '';
+      document.getElementById('modal_item_nome').value = item.produto || '';
+      document.getElementById('modal_item_marca').value = item.marca || '';
+      document.getElementById('modal_item_vol').value = item.volume || '';
+      document.getElementById('modal_item_qtd').value = item.quantidadeNumero || 1;
+      
+      var unid = (item.quantidade || '').replace(/^[0-9\s]+/, '').trim() || 'un';
+      document.getElementById('modal_item_unidade').value = unid;
+      document.getElementById('modal_item_motivo').value = item.motivo || MOTIVO_PADRAO_SCANNER;
+
+      if (elPresets) elPresets.style.display = 'none'; // Oculta presets ao editar item existente
+      elTitulo.innerHTML = '<i class="material-icons tiny">edit</i><span>Editar Dados do Produto</span>';
+
+      if (elOverlay) elOverlay.style.display = 'flex';
+    }
+
+    function ajustarQtdModal(delta) {
+      var el = document.getElementById('modal_item_qtd');
+      if (!el) return;
+      var v = (parseInt(el.value, 10) || 1) + delta;
+      if (v < 1) v = 1;
+      el.value = v;
+    }
+
+    function aplicarPresetModal(tipo) {
+      var elNome = document.getElementById('modal_item_nome');
+      var elMarca = document.getElementById('modal_item_marca');
+      var elVol = document.getElementById('modal_item_vol');
+      var elQtd = document.getElementById('modal_item_qtd');
+      var elUnid = document.getElementById('modal_item_unidade');
+      var elMotivo = document.getElementById('modal_item_motivo');
+
+      if (tipo === 'whey') {
+        elNome.value = 'Whey Protein 100%';
+        elMarca.value = 'Max Titanium';
+        elVol.value = '900g';
+        elUnid.value = 'potes';
+        elMotivo.value = 'Sem registro sanitário na Anvisa';
+      } else if (tipo === 'chocolate') {
+        elNome.value = 'Barra de Chocolate';
+        elMarca.value = 'Nestlé';
+        elVol.value = '80g';
+        elUnid.value = 'barras';
+        elMotivo.value = 'Prazo de validade expirado';
+      } else if (tipo === 'mounjaro') {
+        elNome.value = 'Falso Mounjaro (Tirzepatida clandestina)';
+        elMarca.value = 'Origem Clandestina / Sem Procedência';
+        elVol.value = '15mg/0,5ml';
+        elUnid.value = 'canetas';
+        elMotivo.value = 'Origem clandestina / Falsificação';
+      } else if (tipo === 'cosmetico') {
+        elNome.value = 'Cosmético / Perfume sem registro';
+        elMarca.value = '---';
+        elVol.value = '100ml';
+        elUnid.value = 'frascos';
+        elMotivo.value = 'Sem registro sanitário na Anvisa';
+      } else if (tipo === 'anabolizante') {
+        elNome.value = 'Substância Anabolizante Clandestina';
+        elMarca.value = 'Clandestino';
+        elVol.value = '10ml';
+        elUnid.value = 'ampolas';
+        elMotivo.value = 'Origem clandestina / Falsificação';
+      }
+    }
+
+    function fecharModalItem() {
+      var elOverlay = document.getElementById('modalItemOverlay');
+      if (elOverlay) elOverlay.style.display = 'none';
+      cameraPausada = false;
+    }
+
+    function salvarModalItem() {
+      var idStr = document.getElementById('modal_item_id').value;
+      var ean = document.getElementById('modal_item_ean').value.trim();
+      var nome = document.getElementById('modal_item_nome').value.trim();
+      var marca = document.getElementById('modal_item_marca').value.trim() || '---';
+      var vol = document.getElementById('modal_item_vol').value.trim();
+      var qtdNum = parseInt(document.getElementById('modal_item_qtd').value, 10) || 1;
+      var unidade = document.getElementById('modal_item_unidade').value.trim() || 'un';
+      var motivo = document.getElementById('modal_item_motivo').value;
+
+      if (!nome) {
+        alert('Informe o nome do produto.');
+        document.getElementById('modal_item_nome').focus();
+        return;
+      }
+
+      var qtdTexto = qtdNum + ' ' + unidade;
+
+      if (idStr) {
+        // Editando item existente
+        var idNum = parseInt(idStr, 10);
+        for (var i = 0; i < ITENS_ESCANEADOS.length; i++) {
+          if (ITENS_ESCANEADOS[i].id === idNum) {
+            ITENS_ESCANEADOS[i].produto = nome;
+            ITENS_ESCANEADOS[i].marca = marca;
+            ITENS_ESCANEADOS[i].volume = vol;
+            ITENS_ESCANEADOS[i].quantidadeNumero = qtdNum;
+            ITENS_ESCANEADOS[i].quantidade = qtdTexto;
+            ITENS_ESCANEADOS[i].motivo = motivo;
+            break;
+          }
+        }
+      } else {
+        // Criando novo item
+        if (ean) {
+          CACHE_EAN_MANUAL[ean] = { produto: nome, marca: marca, volume: vol, motivo: motivo };
+        }
+        ITENS_ESCANEADOS.push({
+          id: new Date().getTime() + Math.floor(Math.random() * 1000),
+          ean: ean,
+          produto: nome,
+          marca: marca,
+          volume: vol,
+          registro: '',
+          quantidadeNumero: qtdNum,
+          quantidade: qtdTexto,
+          motivo: motivo
+        });
+      }
+
+      fecharModalItem();
+      renderizarListaItens();
+      sincronizarComJanelaPrincipal(true);
     }
 
     function escaparHtml(str) {
@@ -401,11 +824,12 @@
     }
 
     // ─── SINCRONIZAÇÃO EM TEMPO REAL COM A TELA DO AUTO ───
-    function sincronizarComJanelaPrincipal() {
+    function sincronizarComJanelaPrincipal(substituirTotal) {
       var payload = {
         sistema: 'AMVS_DIGITAL',
         tipo: 'AMVS_PRODUTOS_ATUALIZADOS',
         itens: ITENS_ESCANEADOS,
+        substituirListaCompleta: !!substituirTotal,
         timestamp: Date.now()
       };
 
@@ -490,7 +914,7 @@
     }
 
     function concluirEFechar() {
-      sincronizarComJanelaPrincipal();
+      sincronizarComJanelaPrincipal(true);
       try {
         if (html5QrCode) {
           html5QrCode.stop().then(function() { window.close(); }).catch(function() { window.close(); });
@@ -500,7 +924,6 @@
       } catch(e) {
         window.close();
       }
-      // Se window.close for bloqueado pelo navegador em mobile tab
       setTimeout(function() {
         var btn = document.getElementById('btnConcluirTexto');
         if (btn) btn.innerText = '✔ ITENS SALVOS! FECHE ESTA ABA';
@@ -508,6 +931,7 @@
     }
 
     window.addEventListener('DOMContentLoaded', function() {
+      inicializarItensPreExistentes();
       carregarBaseCmedLocal();
       iniciarCamera();
     });
