@@ -283,14 +283,14 @@
       <input type="hidden" id="modal_item_ean">
 
       <div class="modal-field">
-        <label>Nome do Produto / Descrição *</label>
-        <input type="text" id="modal_item_nome" placeholder="Ex: Whey Protein 100% 900g, Falso Mounjaro...">
+        <label>Nome do Medicamento / Produto *</label>
+        <input type="text" id="modal_item_nome" placeholder="Ex: Nimesulida, Dipirona, Whey Protein 100%...">
       </div>
 
       <div style="display:flex; gap:8px;">
         <div class="modal-field" style="flex:1;">
-          <label>Marca / Fabricante</label>
-          <input type="text" id="modal_item_marca" placeholder="Ex: Max Titanium, Clandestino, Nestlé...">
+          <label>Marca / Nome Comercial</label>
+          <input type="text" id="modal_item_marca" placeholder="Ex: Scaflogin, Novalgina, Max Titanium...">
         </div>
         <div class="modal-field" style="width:115px;">
           <label>Vol. / Apresentação</label>
@@ -556,6 +556,55 @@
         });
     }
 
+    // ─── FORMATAÇÃO E RESOLUÇÃO INTELIGENTE DE MEDICAMENTO E MARCA (ANVISA) ───
+    function formatarNomeMedicamento(str) {
+      if (!str) return '';
+      str = String(str).trim();
+      if (!str) return '';
+      if (/[a-z]/.test(str) && /[A-Z]/.test(str) && str !== str.toUpperCase()) {
+        return str;
+      }
+      var prep = { 'de': 1, 'da': 1, 'do': 1, 'das': 1, 'dos': 1, 'e': 1, 'em': 1, 'com': 1, 'para': 1, 'por': 1, 'a': 1, 'o': 1, 'as': 1, 'os': 1 };
+      var res = str.toLowerCase().replace(/(^|[;\/\+\-\s\(\)])([a-z\u00C0-\u017F])/g, function(match, sep, char) {
+        return sep + char.toUpperCase();
+      });
+      return res.split(' ').map(function(p, i) {
+        if (i > 0 && prep[p.toLowerCase()]) return p.toLowerCase();
+        return p;
+      }).join(' ');
+    }
+
+    function resolverDadosProdutoMedicamento(p, eanFallback) {
+      if (!p) return { produto: 'Produto ' + (eanFallback || ''), marca: '---' };
+
+      var subst = String(p.substancia || p.subst || p.s || '').trim();
+      var prodComercial = String(p.produto || p.prod || p.p || '').trim();
+      var lab = String(p.marca || p.lab || p.m || '').trim();
+      if (lab === '---') lab = '';
+
+      var nomeMedicamento = '';
+      var nomeMarca = '';
+
+      if (subst) {
+        nomeMedicamento = formatarNomeMedicamento(subst);
+        if (prodComercial && prodComercial.toLowerCase() !== subst.toLowerCase()) {
+          nomeMarca = formatarNomeMedicamento(prodComercial);
+        } else if (lab) {
+          nomeMarca = formatarNomeMedicamento(lab);
+        } else {
+          nomeMarca = prodComercial ? formatarNomeMedicamento(prodComercial) : '---';
+        }
+      } else {
+        nomeMedicamento = prodComercial ? formatarNomeMedicamento(prodComercial) : (eanFallback ? ('Produto EAN ' + eanFallback) : 'Produto');
+        nomeMarca = lab ? formatarNomeMedicamento(lab) : '---';
+      }
+
+      return {
+        produto: nomeMedicamento,
+        marca: nomeMarca
+      };
+    }
+
     // ─── PROCESSAMENTO DO CÓDIGO DETECTADO ───
     function aoDetectarCodigo(decodedText) {
       if (cameraPausada) return;
@@ -593,8 +642,9 @@
         var prodInfo = BASE_CMED ? BASE_CMED[ean] : null;
         if (prodInfo) {
           emitirBeepSucesso();
-          var nomeProd = prodInfo.p || prodInfo.prod || ('Medicamento ' + ean);
-          var marca = prodInfo.m || prodInfo.lab || '---';
+          var resolvido = resolverDadosProdutoMedicamento(prodInfo, ean);
+          var nomeProd = resolvido.produto;
+          var marca = resolvido.marca;
           var apres = prodInfo.a || prodInfo.apres || '';
           var reg = prodInfo.r || prodInfo.reg || '';
 
@@ -605,6 +655,7 @@
             marca: marca,
             volume: apres,
             registro: reg,
+            substancia: prodInfo.s || prodInfo.subst || '',
             quantidadeNumero: 1,
             quantidade: '1 un',
             motivo: MOTIVO_PADRAO_SCANNER
