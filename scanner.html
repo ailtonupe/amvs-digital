@@ -208,6 +208,9 @@
         <option value="Armazenamento em temperatura inadequada">Temperatura inadequada</option>
         <option value="Outro motivo">Outro motivo</option>
       </select>
+      <button type="button" onclick="adicionarNovoMotivoScanner()" class="btn-preset" style="color:#ffd54f; border-color:#ffd54f; padding: 2px 6px; height: 30px; display:flex; align-items:center; gap:2px; white-space:nowrap;" title="Cadastrar novo motivo de apreensão">
+        <i class="material-icons tiny">add</i><span>Motivo</span>
+      </button>
     </div>
     <button type="button" onclick="abrirModalProdutoManual('')" class="btn-novo-manual" title="Cadastrar item sem código de barras ou outro gênero (Whey, chocolate, clandestino)">
       <i class="material-icons tiny">add</i><span>Outro Item</span>
@@ -311,7 +314,10 @@
       </div>
 
       <div class="modal-field">
-        <label>Motivo da Apreensão *</label>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <label>Motivo da Apreensão *</label>
+          <button type="button" onclick="adicionarNovoMotivoScanner()" class="btn-preset" style="font-size:0.65rem; padding:1px 6px; color:#ffd54f; border-color:#ffd54f; cursor:pointer;" title="Cadastrar novo motivo">+ Novo</button>
+        </div>
         <select id="modal_item_motivo" class="browser-default motivo-select" style="width:100%; height:38px;">
           <option value="Prazo de validade expirado">Prazo de validade expirado</option>
           <option value="Comércio irregular">Comércio irregular</option>
@@ -404,6 +410,81 @@
         try {
           localStorage.setItem('amvs_scanner_motivo_inicial', novoMotivo);
         } catch(e) {}
+      }
+    }
+
+    // Carrega motivos customizados de localStorage (compartilhado com tela principal do Auto)
+    function carregarMotivosCustomizadosScanner() {
+      try {
+        var raw = localStorage.getItem('amvs_motivos_customizados');
+        if (!raw) return;
+        var lista = JSON.parse(raw);
+        if (!Array.isArray(lista) || lista.length === 0) return;
+
+        var selBarra = document.getElementById('selMotivoScanner');
+        var selModal = document.getElementById('modal_item_motivo');
+
+        lista.forEach(function(m) {
+          if (!m || !m.trim()) return;
+          var texto = m.trim();
+
+          if (selBarra) {
+            var achouB = false;
+            for (var i = 0; i < selBarra.options.length; i++) {
+              if (selBarra.options[i].value === texto) { achouB = true; break; }
+            }
+            if (!achouB) {
+              var optB = document.createElement('option');
+              optB.value = texto;
+              optB.textContent = texto;
+              selBarra.appendChild(optB);
+            }
+          }
+
+          if (selModal) {
+            var achouM = false;
+            for (var j = 0; j < selModal.options.length; j++) {
+              if (selModal.options[j].value === texto) { achouM = true; break; }
+            }
+            if (!achouM) {
+              var optM = document.createElement('option');
+              optM.value = texto;
+              optM.textContent = texto;
+              selModal.appendChild(optM);
+            }
+          }
+        });
+      } catch(e) {
+        console.warn('[carregarMotivosCustomizadosScanner] Erro:', e);
+      }
+    }
+
+    // Adiciona novo motivo personalizado pelo scanner
+    function adicionarNovoMotivoScanner() {
+      var novo = prompt('Cadastrar novo motivo de apreensão:');
+      if (!novo || !novo.trim()) return;
+      novo = novo.trim();
+
+      try {
+        var raw = localStorage.getItem('amvs_motivos_customizados');
+        var lista = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(lista)) lista = [];
+        if (lista.indexOf(novo) === -1) {
+          lista.push(novo);
+          localStorage.setItem('amvs_motivos_customizados', JSON.stringify(lista));
+        }
+      } catch(e) {}
+
+      carregarMotivosCustomizadosScanner();
+
+      var selBarra = document.getElementById('selMotivoScanner');
+      if (selBarra) {
+        selBarra.value = novo;
+        aoMudarMotivoScanner(novo);
+      }
+      var selModal = document.getElementById('modal_item_motivo');
+      if (selModal) {
+        selModal.value = novo;
       }
     }
 
@@ -931,6 +1012,7 @@
     }
 
     window.addEventListener('DOMContentLoaded', function() {
+      carregarMotivosCustomizadosScanner();
       inicializarItensPreExistentes();
       carregarBaseCmedLocal();
       iniciarCamera();
