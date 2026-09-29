@@ -499,8 +499,20 @@
           if (selM) selM.value = motSalvo;
         }
 
-        // Carrega itens que já estavam na lista do Auto
-        var rawItens = localStorage.getItem('amvs_scanner_itens_iniciais');
+        // 1. Tenta carregar itens recebidos via Hash na URL (garante sincronia entre origens diferentes)
+        var rawItens = '';
+        if (location.hash && location.hash.indexOf('#itens=') !== -1) {
+          try {
+            var hashData = location.hash.substring(location.hash.indexOf('#itens=') + 7);
+            rawItens = decodeURIComponent(hashData);
+          } catch(eH) {}
+        }
+
+        // 2. Fallback para localStorage
+        if (!rawItens) {
+          rawItens = localStorage.getItem('amvs_scanner_itens_iniciais') || '';
+        }
+
         if (rawItens) {
           var lista = JSON.parse(rawItens);
           if (Array.isArray(lista) && lista.length > 0) {
