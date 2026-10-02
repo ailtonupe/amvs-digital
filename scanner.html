@@ -152,8 +152,9 @@
       display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;
     }
     .modal-field {
-      display: flex; flex-direction: column; gap: 3px;
+      display: flex; flex-direction: column; gap: 3px; min-width: 0;
     }
+    .modal-field input { box-sizing: border-box !important; width: 100% !important; } /* AMVS-191: campos não vazam do cartão no celular */
     .modal-field label {
       font-size: 0.73rem; color: #b0bec5; font-weight: 600; text-transform: uppercase;
     }
@@ -240,6 +241,12 @@
       <span id="lblBaseCmedStatus" style="font-size: 0.72rem; color: #4db6ac; font-weight: normal;">CMED Carregada</span>
     </div>
 
+    <!-- AMVS-191: pedir lote/fabricação/validade a cada leitura -->
+    <label style="display:flex; align-items:center; gap:6px; padding:4px 14px; font-size:0.74rem; color:#80cbc4; font-weight:600; cursor:pointer; border-bottom:1px solid rgba(255,255,255,0.06);" title="A cada leitura, abre a janela para informar lote, fabricação e validade">
+      <input type="checkbox" id="chkPedirLote" onchange="aoMudarPedirLote(this.checked)" style="position:static; opacity:1; pointer-events:auto; width:16px; height:16px; margin:0;">
+      Pedir lote, fabricação e validade a cada leitura
+    </label>
+
     <div class="scanner-drawer-list" id="listaItensScaneados">
       <div id="msgListaVazia" style="text-align: center; color: #78909c; font-style: italic; padding: 22px 0; font-size: 0.84rem;">
         Aponte a câmera para os códigos de barra dos produtos apreendidos...
@@ -312,6 +319,23 @@
           <input type="text" id="modal_item_unidade" value="un" placeholder="un, potes, caixas, frascos">
         </div>
       </div>
+
+      <!-- AMVS-191: rastreabilidade do item apreendido -->
+      <div style="display:flex; gap:8px;">
+        <div class="modal-field" style="flex:1.3;">
+          <label>Lote</label>
+          <input type="text" id="modal_item_lote" placeholder="Ex: L240915" style="text-transform:uppercase; font-family:monospace;">
+        </div>
+        <div class="modal-field" style="flex:1;">
+          <label>Fabricação</label>
+          <input type="text" id="modal_item_fab" placeholder="MM/AAAA" maxlength="7" inputmode="numeric" oninput="mascararMesAno(this)" style="font-family:monospace;">
+        </div>
+        <div class="modal-field" style="flex:1;">
+          <label>Validade</label>
+          <input type="text" id="modal_item_val" placeholder="MM/AAAA" maxlength="7" inputmode="numeric" oninput="mascararMesAno(this)" style="font-family:monospace;">
+        </div>
+      </div>
+      <input type="hidden" id="modal_item_modo">
 
       <div class="modal-field">
         <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -518,7 +542,9 @@
           if (Array.isArray(lista) && lista.length > 0) {
             ITENS_ESCANEADOS = lista.map(function(it) {
               var qNum = parseInt(String(it.quantidade || '1').replace(/\D/g, ''), 10) || 1;
-              return {
+              // AMVS-191: Object.assign preserva lote, validade, fabricação e demais campos do auto.
+              // Antes eles eram descartados aqui e, na sincronia, apagados do auto.
+              return Object.assign({}, it, {
                 id: it.id || (new Date().getTime() + Math.floor(Math.random() * 1000)),
                 ean: it.ean || '',
                 produto: it.produto || '',
@@ -528,7 +554,7 @@
                 quantidadeNumero: qNum,
                 quantidade: it.quantidade || (qNum + ' un'),
                 motivo: it.motivo || MOTIVO_PADRAO_SCANNER
-              };
+              });
             });
             renderizarListaItens();
           }
@@ -605,6 +631,57 @@
       };
     }
 
+    // ─── AMVS-191: LOTE, FABRICAÇÃO E VALIDADE ───
+    var PEDIR_LOTE_A_CADA_LEITURA = false;
+    try { PEDIR_LOTE_A_CADA_LEITURA = localStorage.getItem('amvs_scanner_pedir_lote') === '1'; } catch (eL) {}
+
+    function aoMudarPedirLote(v) {
+      PEDIR_LOTE_A_CADA_LEITURA = !!v;
+      try { localStorage.setItem('amvs_scanner_pedir_lote', v ? '1' : '0'); } catch (eL) {}
+    }
+
+    function mascararMesAno(el) {
+      var d = String(el.value || '').replace(/\D/g, '').slice(0, 6);
+      el.value = d.length > 2 ? (d.slice(0, 2) + '/' + d.slice(2)) : d;
+    }
+
+    function chaveRastro(it) {
+      return String(it.ean || '') + '|' + String(it.lote || '').trim().toUpperCase() + '|' +
+        String(it.validade || '').trim() + '|' + String(it.fabricacao || '').trim();
+    }
+
+    // Leitura com a opção ligada: abre o modal já com o produto e o último lote usado para esse EAN.
+    // Ao salvar, soma na linha de mesmo EAN + lote + fabricação + validade, ou cria linha nova.
+    function abrirModalLeituraComLote(ean, base) {
+      cameraPausada = true;
+      var ultimo = null;
+      for (var i = ITENS_ESCANEADOS.length - 1; i >= 0; i--) {
+        if (ITENS_ESCANEADOS[i].ean === ean) { ultimo = ITENS_ESCANEADOS[i]; break; }
+      }
+      var ref = ultimo || base || {};
+      document.getElementById('modal_item_id').value = '';
+      document.getElementById('modal_item_modo').value = 'leitura';
+      document.getElementById('modal_item_ean').value = ean;
+      document.getElementById('modal_item_nome').value = ref.produto || '';
+      document.getElementById('modal_item_marca').value = ref.marca || '';
+      document.getElementById('modal_item_vol').value = ref.volume || '';
+      document.getElementById('modal_item_qtd').value = '1';
+      var unid = (ref.quantidade || '').replace(/^[0-9\s]+/, '').trim() || 'un';
+      document.getElementById('modal_item_unidade').value = unid;
+      document.getElementById('modal_item_motivo').value = ref.motivo || MOTIVO_PADRAO_SCANNER;
+      document.getElementById('modal_item_lote').value = ultimo ? (ultimo.lote || '') : '';
+      document.getElementById('modal_item_fab').value = ultimo ? (ultimo.fabricacao || '') : '';
+      document.getElementById('modal_item_val').value = ultimo ? (ultimo.validade || '') : '';
+      var elPresets = document.getElementById('modalItemPresets');
+      if (elPresets) elPresets.style.display = 'none';
+      document.getElementById('modalItemTitulo').innerHTML = '<i class="material-icons tiny">qr_code</i><span>' + escaparHtml(ref.produto || ean) + ': lote e validade</span>';
+      document.getElementById('modalItemOverlay').style.display = 'flex';
+      setTimeout(function() { var el = document.getElementById('modal_item_lote'); if (el) { el.focus(); el.select(); } }, 100);
+      // guarda os dados do produto (CMED) para a linha nova
+      LEITURA_PENDENTE = base || null;
+    }
+    var LEITURA_PENDENTE = null;
+
     // ─── PROCESSAMENTO DO CÓDIGO DETECTADO ───
     function aoDetectarCodigo(decodedText) {
       if (cameraPausada) return;
@@ -618,6 +695,25 @@
         ultimoCodigo = ean;
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(function() { ultimoCodigo = ''; }, 1200);
+
+        // AMVS-191: com "Lote/Val a cada leitura", produto conhecido abre o modal de lote
+        if (PEDIR_LOTE_A_CADA_LEITURA) {
+          var jaNaLista = ITENS_ESCANEADOS.some(function(x) { return x.ean === ean; });
+          var infoCmed = BASE_CMED ? BASE_CMED[ean] : null;
+          var baseLeitura = null;
+          if (infoCmed) {
+            var resLeit = resolverDadosProdutoMedicamento(infoCmed, ean);
+            baseLeitura = { produto: resLeit.produto, marca: resLeit.marca, volume: infoCmed.a || infoCmed.apres || '', registro: infoCmed.r || infoCmed.reg || '', substancia: infoCmed.s || infoCmed.subst || '' };
+          } else if (CACHE_EAN_MANUAL[ean]) {
+            var cmL = CACHE_EAN_MANUAL[ean];
+            baseLeitura = { produto: cmL.produto, marca: cmL.marca || '---', volume: cmL.volume || '', registro: '' };
+          }
+          if (jaNaLista || baseLeitura) {
+            emitirBeepSucesso();
+            abrirModalLeituraComLote(ean, baseLeitura);
+            return;
+          }
+        }
 
         // 1. Procura se este EAN já está na lista atual
         var itemExistente = null;
@@ -749,6 +845,10 @@
           '<div class="scanned-item-info">' +
             '<div class="scanned-item-name">' + escaparHtml(itemNome) + '</div>' +
             '<div class="scanned-item-sub">' + escaparHtml(itemMarca) + escaparHtml(itemVol) + '</div>' +
+            ((it.lote || it.validade || it.fabricacao)
+              ? '<div class="scanned-item-sub" style="color:#80cbc4; font-family:monospace; white-space:normal; overflow:visible; text-overflow:clip; font-size:0.72rem;">' +
+                  (it.lote ? 'Lote ' + escaparHtml(it.lote) : 'Lote —') + (it.fabricacao ? ' · Fab ' + escaparHtml(it.fabricacao) : '') + (it.validade ? ' · Val ' + escaparHtml(it.validade) : '') + '</div>'
+              : '<a href="javascript:void(0)" onclick="abrirModalEditarItem(' + it.id + ')" style="font-size:0.7rem; color:#ffd54f;">+ lote / validade</a>') +
             '<span class="badge-motivo-item" style="' + badgeCor + '">' + escaparHtml(motivoTxt) + '</span>' +
           '</div>' +
           '<div class="scanned-item-ctrls">' +
@@ -806,6 +906,10 @@
       document.getElementById('modal_item_qtd').value = '1';
       document.getElementById('modal_item_unidade').value = 'un';
       document.getElementById('modal_item_motivo').value = MOTIVO_PADRAO_SCANNER;
+      document.getElementById('modal_item_lote').value = '';
+      document.getElementById('modal_item_fab').value = '';
+      document.getElementById('modal_item_val').value = '';
+      document.getElementById('modal_item_modo').value = '';
 
       if (elPresets) elPresets.style.display = 'flex';
 
@@ -841,6 +945,10 @@
       var unid = (item.quantidade || '').replace(/^[0-9\s]+/, '').trim() || 'un';
       document.getElementById('modal_item_unidade').value = unid;
       document.getElementById('modal_item_motivo').value = item.motivo || MOTIVO_PADRAO_SCANNER;
+      document.getElementById('modal_item_lote').value = item.lote || '';
+      document.getElementById('modal_item_fab').value = item.fabricacao || '';
+      document.getElementById('modal_item_val').value = item.validade || '';
+      document.getElementById('modal_item_modo').value = '';
 
       if (elPresets) elPresets.style.display = 'none'; // Oculta presets ao editar item existente
       elTitulo.innerHTML = '<i class="material-icons tiny">edit</i><span>Editar Dados do Produto</span>';
@@ -912,6 +1020,10 @@
       var qtdNum = parseInt(document.getElementById('modal_item_qtd').value, 10) || 1;
       var unidade = document.getElementById('modal_item_unidade').value.trim() || 'un';
       var motivo = document.getElementById('modal_item_motivo').value;
+      var lote = (document.getElementById('modal_item_lote').value || '').trim().toUpperCase();
+      var fab = (document.getElementById('modal_item_fab').value || '').trim();
+      var val = (document.getElementById('modal_item_val').value || '').trim();
+      var modo = document.getElementById('modal_item_modo').value;
 
       if (!nome) {
         alert('Informe o nome do produto.');
@@ -932,26 +1044,47 @@
             ITENS_ESCANEADOS[i].quantidadeNumero = qtdNum;
             ITENS_ESCANEADOS[i].quantidade = qtdTexto;
             ITENS_ESCANEADOS[i].motivo = motivo;
+            ITENS_ESCANEADOS[i].lote = lote;
+            ITENS_ESCANEADOS[i].fabricacao = fab;
+            ITENS_ESCANEADOS[i].validade = val;
             break;
           }
         }
       } else {
         // Criando novo item
-        if (ean) {
+        if (ean && modo !== 'leitura') {
           CACHE_EAN_MANUAL[ean] = { produto: nome, marca: marca, volume: vol, motivo: motivo };
         }
+        // AMVS-191: mesmo EAN + lote + fabricação + validade (em branco só casa com em branco) soma na linha
+        var novoRastro = chaveRastro({ ean: ean, lote: lote, validade: val, fabricacao: fab });
+        var igual = ean ? ITENS_ESCANEADOS.find(function(x) { return chaveRastro(x) === novoRastro; }) : null;
+        if (igual) {
+          igual.quantidadeNumero = (igual.quantidadeNumero || 1) + qtdNum;
+          var unIg = (igual.quantidade || '').replace(/^[0-9\s]+/, '').trim() || unidade;
+          igual.quantidade = igual.quantidadeNumero + ' ' + unIg;
+          fecharModalItem();
+          renderizarListaItens();
+          sincronizarComJanelaPrincipal(true);
+          return;
+        }
+        var basePend = (modo === 'leitura' && LEITURA_PENDENTE) ? LEITURA_PENDENTE : {};
         ITENS_ESCANEADOS.push({
           id: new Date().getTime() + Math.floor(Math.random() * 1000),
           ean: ean,
           produto: nome,
           marca: marca,
           volume: vol,
-          registro: '',
+          registro: basePend.registro || '',
+          substancia: basePend.substancia || '',
           quantidadeNumero: qtdNum,
           quantidade: qtdTexto,
-          motivo: motivo
+          motivo: motivo,
+          lote: lote,
+          fabricacao: fab,
+          validade: val
         });
       }
+      LEITURA_PENDENTE = null;
 
       fecharModalItem();
       renderizarListaItens();
@@ -1075,6 +1208,8 @@
     }
 
     window.addEventListener('DOMContentLoaded', function() {
+      var chk = document.getElementById('chkPedirLote');
+      if (chk) chk.checked = PEDIR_LOTE_A_CADA_LEITURA;
       carregarMotivosCustomizadosScanner();
       inicializarItensPreExistentes();
       carregarBaseCmedLocal();
