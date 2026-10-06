@@ -920,7 +920,9 @@
       return { x: x0 / esc, y: y0 / esc, w: w / esc, h: h / esc };
     }
 
+    var T_INICIO_IA = 0; // AMVS-229: do toque em "Capturar" até os campos preenchidos
     function capturarLoteIA() {
+      T_INICIO_IA = Date.now();
       var video = document.querySelector('#reader video');
       var moldura = document.getElementById('reticuloLote');
       if (!video || !video.videoWidth || !moldura) { statusIA_('Câmera não disponível para a foto.', 'erro'); fecharCapturaLoteIA(true); return; }
@@ -991,7 +993,17 @@
       if (d.validade) document.getElementById('modal_item_val').value = d.validade;
       if (d.fabricacao) document.getElementById('modal_item_fab').value = d.fabricacao;
       var conf = Math.round((Number(d.confianca) || 0) * 100);
-      statusIA_('Lido pela IA' + (conf ? ' (confiança ' + conf + '%)' : '') + ': <b>confira</b> lote e datas antes de salvar.', 'ok');
+      // AMVS-229: tempo total e por etapa (IA, resto do servidor, conexão celular-sistema)
+      var seg = function(ms) { return (ms / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' s'; };
+      var tempo = '';
+      if (T_INICIO_IA) {
+        var total = Date.now() - T_INICIO_IA;
+        var ia = Number(d.msIA) || 0, serv = Number(d.msServidor) || 0, auto = Number(d.msAuto) || 0;
+        tempo = '<br><span style="color:#90a4ae;">Lido em <b>' + seg(total) + '</b>' +
+          (serv ? ' · IA ' + seg(ia) + ' · servidor ' + seg(Math.max(0, serv - ia)) + (auto ? ' · conexão ' + seg(Math.max(0, total - serv)) : '') : '') + '</span>';
+        T_INICIO_IA = 0;
+      }
+      statusIA_('Lido pela IA' + (conf ? ' (confiança ' + conf + '%)' : '') + ': <b>confira</b> lote e datas antes de salvar.' + tempo, 'ok');
     });
 
     // ─── PROCESSAMENTO DO CÓDIGO DETECTADO ───
@@ -1540,6 +1552,13 @@
       inicializarItensPreExistentes();
       carregarBaseCmedLocal();
       iniciarCamera();
+      // AMVS-229: "acorda" o servidor ao abrir e a cada 8 min com a aba visível (a 1ª leitura não paga a partida a frio)
+      var aquecer = function() {
+        try { if (window.opener && !window.opener.closed && document.visibilityState !== 'hidden') window.opener.postMessage({ sistema: 'AMVS_DIGITAL', tipo: 'AMVS_LEITOR_AQUECER' }, '*'); } catch (eA) {}
+      };
+      aquecer();
+      setInterval(aquecer, 8 * 60 * 1000);
+      document.addEventListener('visibilitychange', function() { if (document.visibilityState === 'visible') aquecer(); });
     });
   </script>
 </body>
