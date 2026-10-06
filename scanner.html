@@ -958,7 +958,68 @@
       enviarLoteParaIA_(dataUrl);
     }
 
+    // Alteração por Claude Opus 5.5 - 06/10/2026 - AMVS-230 leitor-fala-direto-com-servidor - [scanner.html - chamada direta]: V1 (NOVO)
+    // A tela do auto entrega o token e o endereço do sistema ao abrir o leitor; daí em diante a leitura
+    // vai direto ao servidor (doPost), sem depender da aba do sistema, que o Android congela em segundo
+    // plano. Guardado só nesta aba (sessionStorage). Pelo /dev (exige login do Google) e em qualquer
+    // falha da chamada direta, volta ao caminho antigo pela tela do auto.
+    var SESSAO_LEITOR = null;
+    try { SESSAO_LEITOR = JSON.parse(sessionStorage.getItem('amvs_leitor_sessao') || 'null'); } catch (eS) {}
+
+    function pedirSessaoAoSistema_() {
+      try { if (window.opener && !window.opener.closed) window.opener.postMessage({ sistema: 'AMVS_DIGITAL', tipo: 'AMVS_LEITOR_PEDE_SESSAO' }, '*'); } catch (e) {}
+    }
+
+    window.addEventListener('message', function(ev) {
+      var d = ev && ev.data;
+      if (!d || d.tipo !== 'AMVS_LEITOR_SESSAO' || !d.token) return;
+      if (window.opener && ev.source !== window.opener) return;
+      SESSAO_LEITOR = { token: String(d.token), url: String(d.url || '') };
+      try { sessionStorage.setItem('amvs_leitor_sessao', JSON.stringify(SESSAO_LEITOR)); } catch (eS) {}
+    });
+
+    function podeChamarDireto_() {
+      return !!(SESSAO_LEITOR && SESSAO_LEITOR.token && /^https:\/\/script\.google\.com\/macros\/s\/[^\/]+\/exec/.test(SESSAO_LEITOR.url || ''));
+    }
+
+    function chamarServidorDireto_(acao, dados, msLimite) {
+      var corpo = Object.assign({ acao: acao, token: SESSAO_LEITOR.token }, dados || {});
+      var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      var t = ctrl ? setTimeout(function() { ctrl.abort(); }, msLimite || 25000) : null;
+      return fetch(SESSAO_LEITOR.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // requisição simples: sem preflight de CORS
+        body: JSON.stringify(corpo),
+        signal: ctrl ? ctrl.signal : undefined
+      }).then(function(r) { if (t) clearTimeout(t); return r.json(); });
+    }
+
     function enviarLoteParaIA_(dataUrl) {
+      var btnD = document.getElementById('btnLerLoteIA');
+      if (podeChamarDireto_()) {
+        PEDIDO_IA_PENDENTE = 'D' + Date.now();
+        var meuPedido = PEDIDO_IA_PENDENTE;
+        statusIA_('<i class="material-icons tiny" style="vertical-align:middle;">hourglass_top</i> Lendo o lote pela IA...', 'info');
+        if (btnD) btnD.disabled = true;
+        chamarServidorDireto_('lerLoteFotoIA', { imagem: dataUrl, mime: 'image/jpeg' }, 25000)
+          .then(function(res) {
+            if (PEDIDO_IA_PENDENTE !== meuPedido) return;
+            // servidor ainda sem a rota nova (resposta sem 'sucesso'): usa o caminho antigo
+            if (!res || typeof res.sucesso === 'undefined') { enviarLoteParaIAPelaTela_(dataUrl); return; }
+            if (res && /sess[aã]o|NAO_AUTENTICADO|login/i.test(String(res.erro || ''))) { SESSAO_LEITOR = null; pedirSessaoAoSistema_(); }
+            tratarRespostaLoteIA_(Object.assign({ reqId: meuPedido, direto: true }, res || { sucesso: false, erro: 'sem resposta' }));
+          })
+          .catch(function() {
+            if (PEDIDO_IA_PENDENTE !== meuPedido) return;
+            // falha da chamada direta: tenta pelo caminho antigo
+            enviarLoteParaIAPelaTela_(dataUrl);
+          });
+        return;
+      }
+      enviarLoteParaIAPelaTela_(dataUrl);
+    }
+
+    function enviarLoteParaIAPelaTela_(dataUrl) {
       if (!window.opener || window.opener.closed) {
         statusIA_('A ligação com a tela do auto se perdeu. Abra o leitor de novo pelo botão "Ler Código".', 'erro');
         return;
@@ -984,6 +1045,11 @@
       var d = ev && ev.data;
       if (!d || d.tipo !== 'AMVS_LOTE_IA_RESULTADO' || !d.reqId || d.reqId !== PEDIDO_IA_PENDENTE) return;
       if (window.opener && ev.source !== window.opener) return;
+      tratarRespostaLoteIA_(d);
+    });
+
+    function tratarRespostaLoteIA_(d) {
+      if (!d || d.reqId !== PEDIDO_IA_PENDENTE) return;
       PEDIDO_IA_PENDENTE = '';
       clearTimeout(TIMER_IA);
       var btn = document.getElementById('btnLerLoteIA'); if (btn) btn.disabled = false;
@@ -1000,11 +1066,12 @@
         var total = Date.now() - T_INICIO_IA;
         var ia = Number(d.msIA) || 0, serv = Number(d.msServidor) || 0, auto = Number(d.msAuto) || 0;
         tempo = '<br><span style="color:#90a4ae;">Lido em <b>' + seg(total) + '</b>' +
-          (serv ? ' · IA ' + seg(ia) + ' · servidor ' + seg(Math.max(0, serv - ia)) + (auto ? ' · conexão ' + seg(Math.max(0, total - serv)) : '') : '') + '</span>';
+          (serv ? ' · IA ' + seg(ia) + ' · servidor ' + seg(Math.max(0, serv - ia)) + ((auto || d.direto) ? ' · conexão ' + seg(Math.max(0, total - serv)) : '') : '') +
+          (d.direto ? ' · direto' : ' · pela tela do auto') + '</span>';
         T_INICIO_IA = 0;
       }
       statusIA_('Lido pela IA' + (conf ? ' (confiança ' + conf + '%)' : '') + ': <b>confira</b> lote e datas antes de salvar.' + tempo, 'ok');
-    });
+    }
 
     // ─── PROCESSAMENTO DO CÓDIGO DETECTADO ───
     function aoDetectarCodigo(decodedText) {
@@ -1553,10 +1620,13 @@
       carregarBaseCmedLocal();
       iniciarCamera();
       // AMVS-229: "acorda" o servidor ao abrir e a cada 8 min com a aba visível (a 1ª leitura não paga a partida a frio)
+      pedirSessaoAoSistema_(); // AMVS-230
       var aquecer = function() {
-        try { if (window.opener && !window.opener.closed && document.visibilityState !== 'hidden') window.opener.postMessage({ sistema: 'AMVS_DIGITAL', tipo: 'AMVS_LEITOR_AQUECER' }, '*'); } catch (eA) {}
+        if (document.visibilityState === 'hidden') return;
+        if (podeChamarDireto_()) { chamarServidorDireto_('aquecerLeituraLoteIA', {}, 20000).catch(function() {}); return; }
+        try { if (window.opener && !window.opener.closed) window.opener.postMessage({ sistema: 'AMVS_DIGITAL', tipo: 'AMVS_LEITOR_AQUECER' }, '*'); } catch (eA) {}
       };
-      aquecer();
+      setTimeout(aquecer, 1500); // dá tempo de a sessão chegar e já aquece pelo caminho direto
       setInterval(aquecer, 8 * 60 * 1000);
       document.addEventListener('visibilitychange', function() { if (document.visibilityState === 'visible') aquecer(); });
     });
