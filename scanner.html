@@ -978,15 +978,25 @@
       try { sessionStorage.setItem('amvs_leitor_sessao', JSON.stringify(SESSAO_LEITOR)); } catch (eS) {}
     });
 
+    // Alteração por Claude Opus 5.5 - 06/10/2026 - AMVS-231 endereco-do-sistema-para-o-leitor - [scanner.html - podeChamarDireto_]: V2
+    // O endereço que vinha do sistema era o texto cru "<?= urlWebApp ?>" (App.html entra por include, que
+    // não processa marcadores). Sem /exec válido, usa o endereço de produção — o mesmo da casca
+    // (index.html). O token vale nele também (mesma aba Sessoes), inclusive quando o sistema foi
+    // aberto pelo /dev.
+    var URL_EXEC_PRODUCAO = 'https://script.google.com/macros/s/AKfycbxBTCIRi8IjBt92IPFFAXG4HTcX5c9GF0eJjgfyry5ehA9tDgvscJelmk3ktfkHWuvJ/exec';
+    function urlDireta_() {
+      var u = (SESSAO_LEITOR && SESSAO_LEITOR.url) || '';
+      return /^https:\/\/script\.google\.com\/macros\/s\/[^\/]+\/exec$/.test(u) ? u : URL_EXEC_PRODUCAO;
+    }
     function podeChamarDireto_() {
-      return !!(SESSAO_LEITOR && SESSAO_LEITOR.token && /^https:\/\/script\.google\.com\/macros\/s\/[^\/]+\/exec/.test(SESSAO_LEITOR.url || ''));
+      return !!(SESSAO_LEITOR && SESSAO_LEITOR.token);
     }
 
     function chamarServidorDireto_(acao, dados, msLimite) {
       var corpo = Object.assign({ acao: acao, token: SESSAO_LEITOR.token }, dados || {});
       var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
       var t = ctrl ? setTimeout(function() { ctrl.abort(); }, msLimite || 25000) : null;
-      return fetch(SESSAO_LEITOR.url, {
+      return fetch(urlDireta_(), {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // requisição simples: sem preflight de CORS
         body: JSON.stringify(corpo),
