@@ -974,7 +974,10 @@
       var d = ev && ev.data;
       if (!d || d.tipo !== 'AMVS_LEITOR_SESSAO' || !d.token) return;
       if (window.opener && ev.source !== window.opener) return;
-      SESSAO_LEITOR = { token: String(d.token), url: String(d.url || '') };
+      // AMVS-232: as mensagens podem vir em duas partes (sessão agora, bilhete do Worker logo depois)
+      SESSAO_LEITOR = Object.assign({}, SESSAO_LEITOR || {}, { token: String(d.token) },
+        d.url !== undefined ? { url: String(d.url || '') } : {},
+        d.bilhete ? { bilhete: String(d.bilhete), bilheteExp: Number(d.bilheteExp) || 0, workerUrl: String(d.workerUrl || '') } : {});
       try { sessionStorage.setItem('amvs_leitor_sessao', JSON.stringify(SESSAO_LEITOR)); } catch (eS) {}
     });
 
@@ -1004,7 +1007,43 @@
       }).then(function(r) { if (t) clearTimeout(t); return r.json(); });
     }
 
+    // Alteração por Claude Opus 5.5 - 06/10/2026 - AMVS-232 leitura-lote-cloudflare - [scanner.html - leitura pelo Worker]: V1 (NOVO)
+    // Primeiro a Cloudflare (sem a partida do Apps Script); se falhar, a chamada direta ao sistema; por
+    // último, a tela do auto.
+    function podeUsarWorker_() {
+      return !!(SESSAO_LEITOR && SESSAO_LEITOR.bilhete && /^https:\/\//.test(SESSAO_LEITOR.workerUrl || '') && (SESSAO_LEITOR.bilheteExp || 0) > Date.now() + 60000);
+    }
+
     function enviarLoteParaIA_(dataUrl) {
+      var btnW = document.getElementById('btnLerLoteIA');
+      if (podeUsarWorker_()) {
+        PEDIDO_IA_PENDENTE = 'W' + Date.now();
+        var pedidoW = PEDIDO_IA_PENDENTE;
+        statusIA_('<i class="material-icons tiny" style="vertical-align:middle;">hourglass_top</i> Lendo o lote pela IA...', 'info');
+        if (btnW) btnW.disabled = true;
+        var ctrlW = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+        var tW = ctrlW ? setTimeout(function() { ctrlW.abort(); }, 15000) : null;
+        fetch(SESSAO_LEITOR.workerUrl.replace(/\/+$/, '') + '/ler-lote', {
+          method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ bilhete: SESSAO_LEITOR.bilhete, imagem: dataUrl, mime: 'image/jpeg' }),
+          signal: ctrlW ? ctrlW.signal : undefined
+        })
+          .then(function(r) { if (tW) clearTimeout(tW); return r.json(); })
+          .then(function(res) {
+            if (PEDIDO_IA_PENDENTE !== pedidoW) return;
+            if (!res || typeof res.sucesso === 'undefined' || res.erro === 'BILHETE_INVALIDO') {
+              if (res && res.erro === 'BILHETE_INVALIDO') { SESSAO_LEITOR.bilhete = ''; pedirSessaoAoSistema_(); }
+              enviarLoteParaIAGas_(dataUrl); return;
+            }
+            tratarRespostaLoteIA_(Object.assign({ reqId: pedidoW, direto: true, worker: true }, res));
+          })
+          .catch(function() { if (PEDIDO_IA_PENDENTE === pedidoW) enviarLoteParaIAGas_(dataUrl); });
+        return;
+      }
+      enviarLoteParaIAGas_(dataUrl);
+    }
+
+    function enviarLoteParaIAGas_(dataUrl) {
       var btnD = document.getElementById('btnLerLoteIA');
       if (podeChamarDireto_()) {
         PEDIDO_IA_PENDENTE = 'D' + Date.now();
@@ -1077,7 +1116,7 @@
         var ia = Number(d.msIA) || 0, serv = Number(d.msServidor) || 0, auto = Number(d.msAuto) || 0;
         tempo = '<br><span style="color:#90a4ae;">Lido em <b>' + seg(total) + '</b>' +
           (serv ? ' · IA ' + seg(ia) + ' · servidor ' + seg(Math.max(0, serv - ia)) + ((auto || d.direto) ? ' · conexão ' + seg(Math.max(0, total - serv)) : '') : '') +
-          (d.direto ? ' · direto' : ' · pela tela do auto') + '</span>';
+          (d.worker ? ' · rápida (Cloudflare)' : (d.direto ? ' · direto' : ' · pela tela do auto')) + '</span>';
         T_INICIO_IA = 0;
       }
       statusIA_('Lido pela IA' + (conf ? ' (confiança ' + conf + '%)' : '') + ': <b>confira</b> lote e datas antes de salvar.' + tempo, 'ok');
@@ -1633,6 +1672,7 @@
       pedirSessaoAoSistema_(); // AMVS-230
       var aquecer = function() {
         if (document.visibilityState === 'hidden') return;
+        if (podeUsarWorker_()) return; // AMVS-232: a Cloudflare não tem partida a frio
         if (podeChamarDireto_()) { chamarServidorDireto_('aquecerLeituraLoteIA', {}, 20000).catch(function() {}); return; }
         try { if (window.opener && !window.opener.closed) window.opener.postMessage({ sistema: 'AMVS_DIGITAL', tipo: 'AMVS_LEITOR_AQUECER' }, '*'); } catch (eA) {}
       };
