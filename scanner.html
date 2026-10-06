@@ -279,6 +279,8 @@
       <input type="checkbox" id="chkPedirLote" onchange="aoMudarPedirLote(this.checked)" style="position:static; opacity:1; pointer-events:auto; width:16px; height:16px; margin:0;">
       Pedir lote, fabricação e validade a cada leitura
     </label>
+    <!-- AMVS-233: bipagem em equipe -->
+    <div id="barraSala" style="display:none; padding:5px 12px; background:#0c4a6e; color:#e0f2fe; font-size:0.76rem; font-weight:600; line-height:1.3;"></div>
     <!-- AMVS-228: lote fixo -->
     <div id="barraLoteFixo"><span id="txtLoteFixo"></span>
       <button type="button" onclick="soltarLoteFixo()" class="btn-preset" style="color:#fff; border-color:#93c5fd; white-space:nowrap;">Soltar</button>
@@ -566,6 +568,7 @@
 
     // Carrega itens pré-existentes passados pela tela principal do Auto
     function inicializarItensPreExistentes() {
+      if (SALA) return; // AMVS-233: em equipe, a lista vem da sala
       try {
         // Carrega motivo inicial se houver
         var motSalvo = localStorage.getItem('amvs_scanner_motivo_inicial');
@@ -979,6 +982,7 @@
         d.url !== undefined ? { url: String(d.url || '') } : {},
         d.bilhete ? { bilhete: String(d.bilhete), bilheteExp: Number(d.bilheteExp) || 0, workerUrl: String(d.workerUrl || '') } : {});
       try { sessionStorage.setItem('amvs_leitor_sessao', JSON.stringify(SESSAO_LEITOR)); } catch (eS) {}
+      if (SALA && !SALA.ws) conectarSala_(); // AMVS-233
     });
 
     // Alteração por Claude Opus 5.5 - 06/10/2026 - AMVS-231 endereco-do-sistema-para-o-leitor - [scanner.html - podeChamarDireto_]: V2
@@ -1121,6 +1125,168 @@
       }
       statusIA_('Lido pela IA' + (conf ? ' (confiança ' + conf + '%)' : '') + ': <b>confira</b> lote e datas antes de salvar.' + tempo, 'ok');
     }
+
+// Alteração por Claude Opus 5.5 - 06/10/2026 - AMVS-233 bipagem-em-equipe - [scanner.html - motor da sala]: V1 (NOVO)
+    // Aberto com ?sala=CODIGO (pela tela do auto ou pelo "Entrar na bipagem"), o leitor entra na sala
+    // do auto no Cloudflare Worker. Toda mudança na lista vira operação de SOMA ({id, k, qtd}) e vai para
+    // a sala; o que não foi confirmado fica guardado neste aparelho e é reenviado quando o sinal voltar
+    // (a sala ignora id repetido). A lista mostrada = estado da sala + operações ainda pendentes.
+    var SALA = null;
+    (function() {
+      var m = String(location.search || '').match(/[?&]sala=([A-Za-z0-9]{6})/);
+      if (!m) return;
+      SALA = { codigo: m[1].toUpperCase(), ws: null, base: {}, pend: {}, online: [], participantes: [], estado: 'aguardando', tent: 0, recebeuEstado: false, encerrada: false };
+      try { SALA.pend = JSON.parse(localStorage.getItem('amvs_sala_pend_' + SALA.codigo) || '{}') || {}; } catch (eP) {}
+    })();
+
+    function chaveSala_(it) {
+      var ean = String(it.ean || '').replace(/\D/g, '');
+      var base = ean.length >= 8 ? ean : ('NOME:' + String(it.produto || '').trim().toUpperCase());
+      return base + '|' + String(it.lote || '').trim().toUpperCase() + '|' + String(it.validade || '').trim() + '|' + String(it.fabricacao || '').trim();
+    }
+
+    function idDaChave_(k) {
+      var h = 0;
+      for (var i = 0; i < k.length; i++) { h = ((h << 5) - h + k.charCodeAt(i)) | 0; }
+      return Math.abs(h) + 1;
+    }
+
+    function novoIdOp_() {
+      return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+    }
+
+    function guardarPendentesSala_() {
+      try { localStorage.setItem('amvs_sala_pend_' + SALA.codigo, JSON.stringify(SALA.pend)); } catch (e) {}
+    }
+
+    function atualizarBarraSala_() {
+      var el = document.getElementById('barraSala');
+      if (!el || !SALA) return;
+      var est = SALA.encerrada ? '⛔ sala encerrada' : (SALA.estado === 'ok' ? '✅ conectado' : (SALA.estado === 'aguardando' ? '⏳ aguardando o login do sistema' : '🔄 reconectando...'));
+      var nomes = SALA.online.map(function(o) { return String(o.nm || o.u).split(' ')[0]; });
+      var npend = Object.keys(SALA.pend).length;
+      el.innerHTML = '👥 Bipagem em equipe <b>' + SALA.codigo + '</b> · ' + est +
+        (nomes.length ? ' · ' + nomes.length + ' online (' + escaparHtml(nomes.join(', ')) + ')' : '') +
+        (npend ? ' · <b style="color:#fde68a;">' + npend + ' aguardando envio</b>' : '');
+      el.style.display = 'block';
+    }
+
+    function reconstruirItensDaSala_() {
+      var mapa = {};
+      Object.keys(SALA.base).forEach(function(k) { mapa[k] = Object.assign({}, SALA.base[k], { porAutor: Object.assign({}, SALA.base[k].porAutor || {}) }); });
+      Object.keys(SALA.pend).forEach(function(id) {
+        var op = SALA.pend[id];
+        var l = mapa[op.k] || Object.assign({ k: op.k, qtd: 0, porAutor: {} }, op.item || {});
+        l.qtd = Math.round(((l.qtd || 0) + op.qtd) * 1000) / 1000;
+        mapa[op.k] = l;
+      });
+      ITENS_ESCANEADOS = Object.keys(mapa).map(function(k) { return mapa[k]; }).filter(function(l) { return l.qtd > 0; }).map(function(l) {
+        return {
+          id: idDaChave_(l.k), ean: l.ean || '', produto: l.produto || '', marca: l.marca || '---', volume: l.volume || '',
+          registro: l.registro || '', substancia: l.substancia || '', lote: l.lote || '', validade: l.validade || '',
+          fabricacao: l.fabricacao || '', motivo: l.motivo || MOTIVO_PADRAO_SCANNER,
+          quantidadeNumero: l.qtd, quantidade: l.qtd + ' ' + (l.unidade || 'un'), porAutor: l.porAutor || {}
+        };
+      });
+      renderizarListaItens();
+      atualizarBarraSala_();
+    }
+
+    // Diferença entre a lista na tela e (sala + pendentes): vira operações de soma
+    function enviarDiferencasSala_() {
+      if (!SALA || SALA.encerrada || !SALA.recebeuEstado) return;
+      var local = {}, esperado = {};
+      ITENS_ESCANEADOS.forEach(function(it) {
+        var k = chaveSala_(it);
+        if (!local[k]) local[k] = { qtd: 0, item: { ean: it.ean || '', produto: it.produto || '', marca: it.marca || '', volume: it.volume || '', registro: it.registro || '', substancia: it.substancia || '', lote: String(it.lote || '').trim().toUpperCase(), validade: it.validade || '', fabricacao: it.fabricacao || '', motivo: it.motivo || '', unidade: (String(it.quantidade || '').replace(/^[0-9.,\s]+/, '').trim() || 'un') } };
+        local[k].qtd += (it.quantidadeNumero || 1);
+      });
+      Object.keys(SALA.base).forEach(function(k) { esperado[k] = (esperado[k] || 0) + (SALA.base[k].qtd || 0); });
+      Object.keys(SALA.pend).forEach(function(id) { var op = SALA.pend[id]; esperado[op.k] = (esperado[op.k] || 0) + op.qtd; });
+      var chaves = {};
+      Object.keys(local).forEach(function(k) { chaves[k] = 1; });
+      Object.keys(esperado).forEach(function(k) { chaves[k] = 1; });
+      var ops = [];
+      Object.keys(chaves).forEach(function(k) {
+        var d = Math.round(((local[k] ? local[k].qtd : 0) - (esperado[k] || 0)) * 1000) / 1000;
+        if (!d) return;
+        var item = local[k] ? local[k].item : (SALA.base[k] || {});
+        ops.push({ id: novoIdOp_(), k: k, qtd: d, item: item });
+      });
+      if (!ops.length) return;
+      ops.forEach(function(op) { SALA.pend[op.id] = op; });
+      guardarPendentesSala_();
+      enviarPendentesSala_();
+      reconstruirItensDaSala_();
+    }
+
+    function enviarPendentesSala_() {
+      if (!SALA || !SALA.ws || SALA.ws.readyState !== 1) { atualizarBarraSala_(); return; }
+      var ops = Object.keys(SALA.pend).map(function(id) { return SALA.pend[id]; });
+      for (var i = 0; i < ops.length; i += 150) {
+        try { SALA.ws.send(JSON.stringify({ tipo: 'ops', ops: ops.slice(i, i + 150) })); } catch (e) {}
+      }
+      atualizarBarraSala_();
+    }
+
+    function conectarSala_() {
+      if (!SALA || SALA.encerrada) return;
+      if (!(SESSAO_LEITOR && SESSAO_LEITOR.bilhete && /^https?:\/\//.test(SESSAO_LEITOR.workerUrl || ''))) {
+        SALA.estado = 'aguardando'; atualizarBarraSala_(); pedirSessaoAoSistema_(); return;
+      }
+      var url = SESSAO_LEITOR.workerUrl.replace(/\/+$/, '').replace(/^http/, 'ws') + '/sala/ws?codigo=' + SALA.codigo +
+        '&papel=leitor&bilhete=' + encodeURIComponent(SESSAO_LEITOR.bilhete);
+      var ws;
+      try { ws = new WebSocket(url); } catch (e) { agendarReconexaoSala_(); return; }
+      SALA.ws = ws;
+      SALA.estado = 'conectando';
+      ws.onopen = function() { SALA.estado = 'ok'; SALA.tent = 0; atualizarBarraSala_(); };
+      ws.onmessage = function(ev) {
+        var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+        if (m.tipo === 'estado') {
+          SALA.base = {};
+          (m.linhas || []).forEach(function(l) { SALA.base[l.k] = l; });
+          SALA.participantes = m.participantes || []; SALA.online = m.online || [];
+          SALA.recebeuEstado = true;
+          reconstruirItensDaSala_();
+          enviarPendentesSala_(); // o que ficou pendente (sinal ruim, recarga) vai agora; a sala ignora repetidos
+        } else if (m.tipo === 'linhas') {
+          (m.linhas || []).forEach(function(l) { if (l.removida) delete SALA.base[l.k]; else SALA.base[l.k] = l; });
+          reconstruirItensDaSala_();
+        } else if (m.tipo === 'ack') {
+          (m.ids || []).forEach(function(id) { delete SALA.pend[id]; });
+          guardarPendentesSala_();
+          reconstruirItensDaSala_();
+        } else if (m.tipo === 'presenca') {
+          SALA.participantes = m.participantes || SALA.participantes; SALA.online = m.online || SALA.online;
+          atualizarBarraSala_();
+        } else if (m.tipo === 'encerrada') {
+          SALA.encerrada = true;
+          atualizarBarraSala_();
+          avisoScanner_('A bipagem em equipe foi encerrada. As leituras já estão no auto.', 5000);
+        }
+      };
+      ws.onclose = function() {
+        if (SALA.ws === ws) SALA.ws = null;
+        if (SALA.encerrada) return;
+        SALA.estado = 'reconectando'; atualizarBarraSala_();
+        agendarReconexaoSala_();
+      };
+      ws.onerror = function() {};
+    }
+
+    function agendarReconexaoSala_() {
+      if (!SALA || SALA.encerrada) return;
+      SALA.tent = Math.min(SALA.tent + 1, 6);
+      clearTimeout(SALA.timerRecon);
+      SALA.timerRecon = setTimeout(conectarSala_, Math.min(15000, 1000 * Math.pow(2, SALA.tent - 1)));
+    }
+
+    // mantém a conexão viva no 4G e reconecta ao voltar para a aba
+    setInterval(function() { if (SALA && SALA.ws && SALA.ws.readyState === 1) { try { SALA.ws.send(JSON.stringify({ tipo: 'ping', t: Date.now() })); } catch (e) {} } }, 25000);
+    document.addEventListener('visibilitychange', function() {
+      if (SALA && !SALA.encerrada && document.visibilityState === 'visible' && (!SALA.ws || SALA.ws.readyState > 1)) { SALA.tent = 0; conectarSala_(); }
+    });
 
     // ─── PROCESSAMENTO DO CÓDIGO DETECTADO ───
     function aoDetectarCodigo(decodedText) {
@@ -1295,6 +1461,8 @@
               ? '<div class="scanned-item-sub" style="color:#80cbc4; font-family:monospace; white-space:normal; overflow:visible; text-overflow:clip; font-size:0.72rem;">' +
                   (it.lote ? 'Lote ' + escaparHtml(it.lote) : 'Lote —') + (it.fabricacao ? ' · Fab ' + escaparHtml(it.fabricacao) : '') + (it.validade ? ' · Val ' + escaparHtml(it.validade) : '') + '</div>'
               : '<a href="javascript:void(0)" onclick="abrirModalEditarItem(' + it.id + ')" style="font-size:0.7rem; color:#ffd54f;">+ lote / validade</a>') +
+            (it.porAutor && SALA ? '<div class="scanned-item-sub" style="color:#93c5fd; white-space:normal;">' +
+              Object.keys(it.porAutor).map(function(n) { return escaparHtml(String(n).split(' ')[0]) + ' ' + it.porAutor[n]; }).join(' · ') + '</div>' : '') + // AMVS-233
             '<span class="badge-motivo-item" style="' + badgeCor + '">' + escaparHtml(motivoTxt) + '</span>' +
           '</div>' +
           '<div class="scanned-item-ctrls">' +
@@ -1556,6 +1724,7 @@
 
     // ─── SINCRONIZAÇÃO EM TEMPO REAL COM A TELA DO AUTO ───
     function sincronizarComJanelaPrincipal(substituirTotal) {
+      if (SALA) { enviarDiferencasSala_(); return; } // AMVS-233
       var payload = {
         sistema: 'AMVS_DIGITAL',
         tipo: 'AMVS_PRODUTOS_ATUALIZADOS',
@@ -1645,6 +1814,10 @@
     }
 
     function concluirEFechar() {
+      if (SALA && Object.keys(SALA.pend).length) { // AMVS-233
+        avisoScanner_('Ainda há ' + Object.keys(SALA.pend).length + ' leitura(s) aguardando envio para a sala. Espere o sinal voltar.', 4000);
+        return;
+      }
       sincronizarComJanelaPrincipal(true);
       try {
         if (html5QrCode) {
@@ -1670,6 +1843,7 @@
       iniciarCamera();
       // AMVS-229: "acorda" o servidor ao abrir e a cada 8 min com a aba visível (a 1ª leitura não paga a partida a frio)
       pedirSessaoAoSistema_(); // AMVS-230
+      if (SALA) { atualizarBarraSala_(); conectarSala_(); } // AMVS-233
       var aquecer = function() {
         if (document.visibilityState === 'hidden') return;
         if (podeUsarWorker_()) return; // AMVS-232: a Cloudflare não tem partida a frio
