@@ -172,6 +172,25 @@
     .btn-preset:active { background: #334155; }
     .btn-preset.red-preset { border-color: #ef5350; color: #ef5350; }
     .btn-preset.green-preset { border-color: #66bb6a; color: #66bb6a; }
+
+    /* AMVS-228: lotes já usados como botões, leitura do lote por foto (IA) e lote fixo */
+    .chips-lotes { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip-lote { background: #0f3d2e; color: #b9f6ca; border: 1px solid #00e676; border-radius: 14px; padding: 7px 10px;
+      font-size: 0.8rem; font-weight: 700; font-family: monospace; cursor: pointer; text-align: left; line-height: 1.2; }
+    .chip-lote small { color: #80cbc4; font-weight: 500; font-family: -apple-system, Roboto, sans-serif; }
+    .chip-lote:active { background: #14532d; }
+    .btn-ia-lote { background: #1e3a8a; color: #fff; border: 1px solid #60a5fa; border-radius: 6px; padding: 9px 10px; font-size: 0.84rem;
+      font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; width: 100%; }
+    .btn-ia-lote:active { background: #1d4ed8; }
+    #reticuloLote { display: none; position: absolute; left: 4%; width: 92%; top: 22%; height: 46%; border: 3px solid #60a5fa; border-radius: 10px;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,0.55); z-index: 55; pointer-events: none; }
+    #reticuloLote span { position: absolute; top: -26px; left: 0; right: 0; text-align: center; color: #bfdbfe; font-size: 0.8rem; font-weight: 700; }
+    #capturaLoteControles { display: none; position: fixed; left: 0; right: 0; bottom: 0; height: 235px; background: #0b1220; border-top: 2px solid #60a5fa;
+      z-index: 250; flex-direction: column; justify-content: center; gap: 10px; padding: 14px; }
+    #barraLoteFixo { display: none; padding: 5px 12px; background: #1e3a8a; color: #dbeafe; font-size: 0.76rem; font-weight: 600;
+      align-items: center; justify-content: space-between; gap: 8px; }
+    #toastScanner { display: none; position: fixed; top: 100px; left: 50%; transform: translateX(-50%); max-width: 92%; z-index: 400;
+      background: rgba(15, 23, 42, 0.95); color: #fff; border: 1px solid #00e676; border-radius: 8px; padding: 8px 14px; font-size: 0.85rem; text-align: center; }
   </style>
 </head>
 <body>
@@ -232,7 +251,21 @@
         <div class="reticulo-canto-br"></div>
       </div>
     </div>
+    <!-- AMVS-228: moldura da área do lote (só a parte dentro dela vai para a IA) -->
+    <div id="reticuloLote"><span>Enquadre só o lote e as datas</span></div>
   </div>
+
+  <div id="capturaLoteControles">
+    <div style="color:#bfdbfe; font-size:0.85rem; text-align:center; line-height:1.35;">
+      Vire a caixa para a aba onde estão o <b>lote</b> e as <b>datas</b> e deixe só essa parte dentro da moldura azul.
+      Se estiver escuro, ligue a lanterna (botão no topo).
+    </div>
+    <button type="button" onclick="capturarLoteIA()" class="btn waves-effect waves-light blue darken-2" style="height:52px; font-weight:700; font-size:1rem; border-radius:8px; text-transform:none;">
+      <i class="material-icons left">photo_camera</i>Capturar e ler
+    </button>
+    <button type="button" onclick="fecharCapturaLoteIA(true)" class="btn-flat grey-text text-lighten-1" style="text-transform:none;">Cancelar</button>
+  </div>
+  <div id="toastScanner"></div>
 
   <!-- PAINEL INFERIOR: LISTA DE PRODUTOS APREENDIDOS -->
   <div class="scanner-drawer">
@@ -246,6 +279,10 @@
       <input type="checkbox" id="chkPedirLote" onchange="aoMudarPedirLote(this.checked)" style="position:static; opacity:1; pointer-events:auto; width:16px; height:16px; margin:0;">
       Pedir lote, fabricação e validade a cada leitura
     </label>
+    <!-- AMVS-228: lote fixo -->
+    <div id="barraLoteFixo"><span id="txtLoteFixo"></span>
+      <button type="button" onclick="soltarLoteFixo()" class="btn-preset" style="color:#fff; border-color:#93c5fd; white-space:nowrap;">Soltar</button>
+    </div>
 
     <div class="scanner-drawer-list" id="listaItensScaneados">
       <div id="msgListaVazia" style="text-align: center; color: #78909c; font-style: italic; padding: 22px 0; font-size: 0.84rem;">
@@ -306,12 +343,14 @@
       </div>
 
       <div style="display:flex; gap:8px; align-items:center;">
-        <div class="modal-field" style="width:125px;">
+        <div class="modal-field" style="flex:1.6;">
           <label>Quantidade *</label>
           <div style="display:flex; align-items:center; gap:4px;">
             <button type="button" class="btn-qty" onclick="ajustarQtdModal(-1)">-</button>
-            <input type="number" id="modal_item_qtd" min="1" value="1" style="text-align:center; font-weight:bold; color:#00e676;">
+            <input type="number" id="modal_item_qtd" min="1" value="1" style="text-align:center; font-weight:bold; color:#00e676; min-width:44px;">
             <button type="button" class="btn-qty" onclick="ajustarQtdModal(1)">+</button>
+            <button type="button" class="btn-qty" style="width:32px;" onclick="ajustarQtdModal(5)">+5</button>
+            <button type="button" class="btn-qty" style="width:36px;" onclick="ajustarQtdModal(10)">+10</button>
           </div>
         </div>
         <div class="modal-field" style="flex:1;">
@@ -320,6 +359,15 @@
         </div>
       </div>
 
+      <!-- AMVS-228: lotes já usados neste auto (um toque salva), leitura por foto (IA) e lote fixo -->
+      <div id="modalLotesChipsBox" style="display:none; flex-direction:column; gap:4px;">
+        <span style="font-size:0.7rem; color:#90a4ae; font-weight:600;">Lotes deste produto já registrados (toque para somar):</span>
+        <div id="modalLotesChips" class="chips-lotes"></div>
+      </div>
+      <button type="button" id="btnLerLoteIA" class="btn-ia-lote" onclick="abrirCapturaLoteIA()">
+        <i class="material-icons" style="font-size:1.1rem;">document_scanner</i>Ler lote e datas pela câmera (IA)
+      </button>
+      <div id="statusLoteIA" style="display:none; font-size:0.76rem; padding:4px 8px; border-radius:4px;"></div>
       <!-- AMVS-191: rastreabilidade do item apreendido -->
       <div style="display:flex; gap:8px;">
         <div class="modal-field" style="flex:1.3;">
@@ -336,6 +384,10 @@
         </div>
       </div>
       <input type="hidden" id="modal_item_modo">
+      <label id="lblFixarLote" style="display:none; align-items:center; gap:6px; font-size:0.74rem; color:#93c5fd; font-weight:600; cursor:pointer;">
+        <input type="checkbox" id="chkFixarLote" style="position:static; opacity:1; pointer-events:auto; width:16px; height:16px; margin:0;">
+        Fixar este lote: as próximas leituras deste produto somam nele, sem abrir esta janela
+      </label>
 
       <div class="modal-field">
         <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -632,8 +684,9 @@
     }
 
     // ─── AMVS-191: LOTE, FABRICAÇÃO E VALIDADE ───
-    var PEDIR_LOTE_A_CADA_LEITURA = false;
-    try { PEDIR_LOTE_A_CADA_LEITURA = localStorage.getItem('amvs_scanner_pedir_lote') === '1'; } catch (eL) {}
+    // AMVS-228: ligado por padrão (o lote é o que mais pesa no confronto); quem desligou continua desligado
+    var PEDIR_LOTE_A_CADA_LEITURA = true;
+    try { var vPedir = localStorage.getItem('amvs_scanner_pedir_lote'); PEDIR_LOTE_A_CADA_LEITURA = (vPedir === null) ? true : vPedir === '1'; } catch (eL) {}
 
     function aoMudarPedirLote(v) {
       PEDIR_LOTE_A_CADA_LEITURA = !!v;
@@ -669,18 +722,277 @@
       var unid = (ref.quantidade || '').replace(/^[0-9\s]+/, '').trim() || 'un';
       document.getElementById('modal_item_unidade').value = unid;
       document.getElementById('modal_item_motivo').value = ref.motivo || MOTIVO_PADRAO_SCANNER;
-      document.getElementById('modal_item_lote').value = ultimo ? (ultimo.lote || '') : '';
-      document.getElementById('modal_item_fab').value = ultimo ? (ultimo.fabricacao || '') : '';
-      document.getElementById('modal_item_val').value = ultimo ? (ultimo.validade || '') : '';
+      // AMVS-228: lote e datas em branco. Antes vinham do último lote e, trocando só o lote, a validade
+      // antiga ia junto para o lote novo. Os lotes já registrados aparecem como botões.
+      document.getElementById('modal_item_lote').value = '';
+      document.getElementById('modal_item_fab').value = '';
+      document.getElementById('modal_item_val').value = '';
       var elPresets = document.getElementById('modalItemPresets');
       if (elPresets) elPresets.style.display = 'none';
       document.getElementById('modalItemTitulo').innerHTML = '<i class="material-icons tiny">qr_code</i><span>' + escaparHtml(ref.produto || ean) + ': lote e validade</span>';
+      prepararExtrasModalLote_(ean, true);
       document.getElementById('modalItemOverlay').style.display = 'flex';
-      setTimeout(function() { var el = document.getElementById('modal_item_lote'); if (el) { el.focus(); el.select(); } }, 100);
+      // AMVS-228: com lotes já registrados, o foco não abre o teclado por cima dos botões
+      if (!LOTES_CHIPS_ATUAIS.length) setTimeout(function() { var el = document.getElementById('modal_item_lote'); if (el) { el.focus(); el.select(); } }, 100);
       // guarda os dados do produto (CMED) para a linha nova
       LEITURA_PENDENTE = base || null;
     }
     var LEITURA_PENDENTE = null;
+
+    // Alteração por Claude Opus 5.5 - 06/10/2026 - AMVS-228 lote-por-foto-ia - [scanner.html - lotes, lote fixo e leitura por IA]: V1 (NOVO)
+    var LOTES_CHIPS_ATUAIS = [];
+    var LOTE_FIXO = null;
+
+    function avisoScanner_(txt, ms) {
+      var el = document.getElementById('toastScanner');
+      if (!el) return;
+      el.innerHTML = txt;
+      el.style.display = 'block';
+      clearTimeout(avisoScanner_.t);
+      avisoScanner_.t = setTimeout(function() { el.style.display = 'none'; }, ms || 1800);
+    }
+
+    // Botões com os lotes deste EAN já registrados nesta leitura (não depende de nota fiscal)
+    function prepararExtrasModalLote_(ean, modoLeitura) {
+      var box = document.getElementById('modalLotesChipsBox');
+      var cont = document.getElementById('modalLotesChips');
+      var lblFixar = document.getElementById('lblFixarLote');
+      var chkFixar = document.getElementById('chkFixarLote');
+      var st = document.getElementById('statusLoteIA');
+      if (st) { st.style.display = 'none'; st.innerHTML = ''; }
+      if (chkFixar) chkFixar.checked = false;
+      if (lblFixar) lblFixar.style.display = modoLeitura ? 'flex' : 'none';
+      LOTES_CHIPS_ATUAIS = [];
+      if (modoLeitura && ean) {
+        var vistos = {};
+        ITENS_ESCANEADOS.forEach(function(it) {
+          if (it.ean !== ean || !it.lote) return;
+          var k = chaveRastro(it);
+          if (vistos[k] === undefined) { vistos[k] = LOTES_CHIPS_ATUAIS.length; LOTES_CHIPS_ATUAIS.push({ lote: it.lote, validade: it.validade || '', fabricacao: it.fabricacao || '', qtd: 0 }); }
+          LOTES_CHIPS_ATUAIS[vistos[k]].qtd += (it.quantidadeNumero || 1);
+        });
+      }
+      if (!box || !cont) return;
+      if (!LOTES_CHIPS_ATUAIS.length) { box.style.display = 'none'; cont.innerHTML = ''; return; }
+      cont.innerHTML = LOTES_CHIPS_ATUAIS.map(function(c, i) {
+        return '<button type="button" class="chip-lote" onclick="usarLoteChip(' + i + ')">' + escaparHtml(c.lote) +
+          '<br><small>' + (c.validade ? 'Val ' + escaparHtml(c.validade) + ' · ' : '') + 'já tem ' + c.qtd + '</small></button>';
+      }).join('');
+      box.style.display = 'flex';
+    }
+
+    // Um toque: preenche lote/validade/fabricação do botão e salva (soma na mesma linha)
+    function usarLoteChip(i) {
+      var c = LOTES_CHIPS_ATUAIS[i];
+      if (!c) return;
+      document.getElementById('modal_item_lote').value = c.lote;
+      document.getElementById('modal_item_val').value = c.validade;
+      document.getElementById('modal_item_fab').value = c.fabricacao;
+      var qtd = parseInt(document.getElementById('modal_item_qtd').value, 10) || 1;
+      salvarModalItem();
+      avisoScanner_('+' + qtd + ' no lote <b>' + escaparHtml(c.lote) + '</b> (total ' + (c.qtd + qtd) + ')');
+    }
+
+    function atualizarBarraLoteFixo_() {
+      var barra = document.getElementById('barraLoteFixo');
+      var txt = document.getElementById('txtLoteFixo');
+      if (!barra || !txt) return;
+      if (!LOTE_FIXO) { barra.style.display = 'none'; return; }
+      txt.innerHTML = '📌 Lote fixo <b>' + escaparHtml(LOTE_FIXO.lote) + '</b> · ' + escaparHtml(String(LOTE_FIXO.produto || '').slice(0, 28));
+      barra.style.display = 'flex';
+    }
+
+    function soltarLoteFixo() {
+      LOTE_FIXO = null;
+      atualizarBarraLoteFixo_();
+      avisoScanner_('Lote solto: a próxima leitura volta a perguntar o lote.');
+    }
+
+    function somarNoLoteFixo_() {
+      var f = LOTE_FIXO;
+      var alvo = ITENS_ESCANEADOS.find(function(x) { return chaveRastro(x) === chaveRastro(f); });
+      if (alvo) {
+        alvo.quantidadeNumero = (alvo.quantidadeNumero || 1) + 1;
+        var un = (alvo.quantidade || '').replace(/^[0-9\s]+/, '').trim() || 'un';
+        alvo.quantidade = alvo.quantidadeNumero + ' ' + un;
+      } else {
+        var info = BASE_CMED ? BASE_CMED[f.ean] : null;
+        var resF = info ? resolverDadosProdutoMedicamento(info, f.ean) : { produto: f.produto, marca: '---' };
+        alvo = {
+          id: new Date().getTime() + Math.floor(Math.random() * 1000),
+          ean: f.ean, produto: resF.produto || f.produto, marca: resF.marca || '---',
+          volume: info ? (info.a || info.apres || '') : '', registro: info ? (info.r || info.reg || '') : '',
+          substancia: info ? (info.s || info.subst || '') : '',
+          quantidadeNumero: 1, quantidade: '1 un', motivo: MOTIVO_PADRAO_SCANNER,
+          lote: f.lote, validade: f.validade, fabricacao: f.fabricacao
+        };
+        ITENS_ESCANEADOS.push(alvo);
+      }
+      emitirBeepSucesso();
+      renderizarListaItens();
+      sincronizarComJanelaPrincipal(true);
+      avisoScanner_('+1 lote <b>' + escaparHtml(f.lote) + '</b> · total ' + alvo.quantidadeNumero);
+    }
+
+    // ── Leitura do lote por foto (IA) ──
+    // A moldura azul define a área; dentro dela o recorte é refinado para a região com texto impresso
+    // (como o "detectar bordas" dos scanners de documento), reduzido a no máximo 768x384 px (o menor
+    // tamanho que a IA cobra) e enviado à tela do auto, que chama o servidor com a sessão do fiscal.
+    var PEDIDO_IA_PENDENTE = '';
+    var TIMER_IA = null;
+    var CONFIG_VIDEO_ANTES_IA = null;
+
+    function trilhaVideo_() {
+      var v = document.querySelector('#reader video');
+      return (v && v.srcObject && v.srcObject.getVideoTracks) ? v.srcObject.getVideoTracks()[0] : null;
+    }
+
+    function statusIA_(html, cor) {
+      var st = document.getElementById('statusLoteIA');
+      if (!st) return;
+      st.innerHTML = html;
+      st.style.display = html ? 'block' : 'none';
+      st.style.background = cor === 'erro' ? 'rgba(239,83,80,0.18)' : (cor === 'ok' ? 'rgba(255,213,79,0.15)' : 'rgba(96,165,250,0.15)');
+      st.style.color = cor === 'erro' ? '#ff8a80' : (cor === 'ok' ? '#ffd54f' : '#bfdbfe');
+    }
+
+    function abrirCapturaLoteIA() {
+      if (!window.opener || window.opener.closed) {
+        statusIA_('A ligação com a tela do auto se perdeu. Feche esta aba e abra o leitor de novo pelo botão "Ler Código".', 'erro');
+        return;
+      }
+      cameraPausada = true;
+      document.getElementById('modalItemOverlay').style.display = 'none';
+      var ret = document.querySelector('.reticulo-overlay'); if (ret) ret.style.display = 'none';
+      document.getElementById('reticuloLote').style.display = 'block';
+      document.getElementById('capturaLoteControles').style.display = 'flex';
+      // mais resolução só durante a captura: o lote impresso é pequeno
+      var t = trilhaVideo_();
+      if (t && t.applyConstraints) {
+        try { CONFIG_VIDEO_ANTES_IA = t.getSettings ? t.getSettings() : null; } catch (eS) {}
+        t.applyConstraints({ width: { ideal: 1920 }, height: { ideal: 1080 } }).catch(function() {});
+      }
+    }
+
+    function fecharCapturaLoteIA(voltarAoModal) {
+      document.getElementById('reticuloLote').style.display = 'none';
+      document.getElementById('capturaLoteControles').style.display = 'none';
+      var ret = document.querySelector('.reticulo-overlay'); if (ret) ret.style.display = 'flex';
+      var t = trilhaVideo_();
+      if (t && t.applyConstraints && CONFIG_VIDEO_ANTES_IA && CONFIG_VIDEO_ANTES_IA.width) {
+        t.applyConstraints({ width: { ideal: CONFIG_VIDEO_ANTES_IA.width }, height: { ideal: CONFIG_VIDEO_ANTES_IA.height } }).catch(function() {});
+      }
+      if (voltarAoModal) document.getElementById('modalItemOverlay').style.display = 'flex';
+    }
+
+    // Refina o recorte para a região com mais bordas (texto impresso); devolve {x,y,w,h} no canvas
+    function regiaoComTexto_(canvas) {
+      var W = canvas.width, Hh = canvas.height;
+      var esc = Math.min(1, 240 / W);
+      var sw = Math.max(8, Math.round(W * esc)), sh = Math.max(8, Math.round(Hh * esc));
+      var c2 = document.createElement('canvas'); c2.width = sw; c2.height = sh;
+      var x2 = c2.getContext('2d'); x2.drawImage(canvas, 0, 0, sw, sh);
+      var d = x2.getImageData(0, 0, sw, sh).data;
+      var g = new Float32Array(sw * sh);
+      for (var i = 0; i < sw * sh; i++) g[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+      var col = new Float32Array(sw), lin = new Float32Array(sh);
+      for (var y = 1; y < sh - 1; y++) {
+        for (var x = 1; x < sw - 1; x++) {
+          var e = Math.abs(g[y * sw + x + 1] - g[y * sw + x - 1]) + Math.abs(g[(y + 1) * sw + x] - g[(y - 1) * sw + x]);
+          if (e > 70) { col[x]++; lin[y]++; }
+        }
+      }
+      var maxC = 0, maxL = 0;
+      for (var a = 0; a < sw; a++) maxC = Math.max(maxC, col[a]);
+      for (var b = 0; b < sh; b++) maxL = Math.max(maxL, lin[b]);
+      if (maxC < 3 || maxL < 3) return null;
+      var x0 = 0, x1 = sw - 1, y0 = 0, y1 = sh - 1;
+      while (x0 < sw && col[x0] < maxC * 0.12) x0++;
+      while (x1 > x0 && col[x1] < maxC * 0.12) x1--;
+      while (y0 < sh && lin[y0] < maxL * 0.12) y0++;
+      while (y1 > y0 && lin[y1] < maxL * 0.12) y1--;
+      // margem de 12% e tamanho mínimo, para nunca cortar um caractere da ponta
+      var mx = (x1 - x0) * 0.12 + 4, my = (y1 - y0) * 0.12 + 4;
+      x0 = Math.max(0, x0 - mx); x1 = Math.min(sw - 1, x1 + mx); y0 = Math.max(0, y0 - my); y1 = Math.min(sh - 1, y1 + my);
+      var w = x1 - x0, h = y1 - y0;
+      if (w < sw * 0.35) { var cx = (x0 + x1) / 2; w = sw * 0.35; x0 = Math.max(0, Math.min(sw - w, cx - w / 2)); }
+      if (h < sh * 0.30) { var cy = (y0 + y1) / 2; h = sh * 0.30; y0 = Math.max(0, Math.min(sh - h, cy - h / 2)); }
+      return { x: x0 / esc, y: y0 / esc, w: w / esc, h: h / esc };
+    }
+
+    function capturarLoteIA() {
+      var video = document.querySelector('#reader video');
+      var moldura = document.getElementById('reticuloLote');
+      if (!video || !video.videoWidth || !moldura) { statusIA_('Câmera não disponível para a foto.', 'erro'); fecharCapturaLoteIA(true); return; }
+      var vw = video.videoWidth, vh = video.videoHeight;
+      var rv = video.getBoundingClientRect(), rm = moldura.getBoundingClientRect();
+      // o vídeo está em object-fit: cover: converte a moldura da tela para pixels do vídeo
+      var escTela = Math.max(rv.width / vw, rv.height / vh);
+      var offX = rv.left + (rv.width - vw * escTela) / 2, offY = rv.top + (rv.height - vh * escTela) / 2;
+      var sx = Math.max(0, (rm.left - offX) / escTela), sy = Math.max(0, (rm.top - offY) / escTela);
+      var sw = Math.min(vw - sx, rm.width / escTela), sh = Math.min(vh - sy, rm.height / escTela);
+      var c1 = document.createElement('canvas'); c1.width = Math.round(sw); c1.height = Math.round(sh);
+      c1.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, c1.width, c1.height);
+      var reg = regiaoComTexto_(c1) || { x: 0, y: 0, w: c1.width, h: c1.height };
+      // no máximo 768x384 (um bloco de imagem para a IA), sem ampliar
+      var esc = Math.min(1, 768 / reg.w, 384 / reg.h);
+      var c3 = document.createElement('canvas'); c3.width = Math.max(1, Math.round(reg.w * esc)); c3.height = Math.max(1, Math.round(reg.h * esc));
+      var x3 = c3.getContext('2d'); x3.drawImage(c1, reg.x, reg.y, reg.w, reg.h, 0, 0, c3.width, c3.height);
+      // cinza + contraste (estica entre os percentis 2 e 98): jato de tinta claro fica legível
+      try {
+        var img = x3.getImageData(0, 0, c3.width, c3.height), px = img.data, n = c3.width * c3.height, hist = new Uint32Array(256);
+        var cinza = new Uint8ClampedArray(n);
+        for (var i = 0; i < n; i++) { var v = Math.round(0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2]); cinza[i] = v; hist[v]++; }
+        var acum = 0, lo = 0, hi = 255;
+        for (var k = 0; k < 256; k++) { acum += hist[k]; if (acum >= n * 0.02) { lo = k; break; } }
+        acum = 0;
+        for (var k2 = 255; k2 >= 0; k2--) { acum += hist[k2]; if (acum >= n * 0.02) { hi = k2; break; } }
+        var amp = Math.max(1, hi - lo);
+        for (var j = 0; j < n; j++) { var vv = Math.max(0, Math.min(255, (cinza[j] - lo) * 255 / amp)); px[j * 4] = px[j * 4 + 1] = px[j * 4 + 2] = vv; }
+        x3.putImageData(img, 0, 0);
+      } catch (eC) {}
+      var dataUrl = c3.toDataURL('image/jpeg', 0.85);
+      fecharCapturaLoteIA(true);
+      enviarLoteParaIA_(dataUrl);
+    }
+
+    function enviarLoteParaIA_(dataUrl) {
+      if (!window.opener || window.opener.closed) {
+        statusIA_('A ligação com a tela do auto se perdeu. Abra o leitor de novo pelo botão "Ler Código".', 'erro');
+        return;
+      }
+      PEDIDO_IA_PENDENTE = 'L' + Date.now();
+      statusIA_('<i class="material-icons tiny" style="vertical-align:middle;">hourglass_top</i> Lendo o lote pela IA...', 'info');
+      var btn = document.getElementById('btnLerLoteIA'); if (btn) btn.disabled = true;
+      clearTimeout(TIMER_IA);
+      TIMER_IA = setTimeout(function() {
+        PEDIDO_IA_PENDENTE = '';
+        if (btn) btn.disabled = false;
+        statusIA_('Sem resposta em 30 s. Confira a internet e se a tela do auto continua aberta, ou digite o lote.', 'erro');
+      }, 30000);
+      try {
+        window.opener.postMessage({ sistema: 'AMVS_DIGITAL', tipo: 'AMVS_LER_LOTE_IA', reqId: PEDIDO_IA_PENDENTE, imagem: dataUrl, mime: 'image/jpeg' }, '*');
+      } catch (eP) {
+        clearTimeout(TIMER_IA); if (btn) btn.disabled = false;
+        statusIA_('Não foi possível falar com a tela do auto: ' + escaparHtml(String(eP.message || eP)), 'erro');
+      }
+    }
+
+    window.addEventListener('message', function(ev) {
+      var d = ev && ev.data;
+      if (!d || d.tipo !== 'AMVS_LOTE_IA_RESULTADO' || !d.reqId || d.reqId !== PEDIDO_IA_PENDENTE) return;
+      if (window.opener && ev.source !== window.opener) return;
+      PEDIDO_IA_PENDENTE = '';
+      clearTimeout(TIMER_IA);
+      var btn = document.getElementById('btnLerLoteIA'); if (btn) btn.disabled = false;
+      if (!d.sucesso) { statusIA_('A IA não leu: ' + escaparHtml(d.erro || 'erro') + '. Tente de novo ou digite.', 'erro'); return; }
+      if (!d.lote && !d.validade && !d.fabricacao) { statusIA_('A IA não encontrou lote nem datas na foto. Aproxime, ilumine e tente de novo.', 'erro'); return; }
+      if (d.lote) document.getElementById('modal_item_lote').value = d.lote;
+      if (d.validade) document.getElementById('modal_item_val').value = d.validade;
+      if (d.fabricacao) document.getElementById('modal_item_fab').value = d.fabricacao;
+      var conf = Math.round((Number(d.confianca) || 0) * 100);
+      statusIA_('Lido pela IA' + (conf ? ' (confiança ' + conf + '%)' : '') + ': <b>confira</b> lote e datas antes de salvar.', 'ok');
+    });
 
     // ─── PROCESSAMENTO DO CÓDIGO DETECTADO ───
     function aoDetectarCodigo(decodedText) {
@@ -695,6 +1007,12 @@
         ultimoCodigo = ean;
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(function() { ultimoCodigo = ''; }, 1200);
+
+        // AMVS-228: lote fixo para este produto: soma direto, sem abrir a janela
+        if (LOTE_FIXO && LOTE_FIXO.ean === ean) {
+          somarNoLoteFixo_();
+          return;
+        }
 
         // AMVS-191: com "Lote/Val a cada leitura", produto conhecido abre o modal de lote
         if (PEDIR_LOTE_A_CADA_LEITURA) {
@@ -912,6 +1230,7 @@
       document.getElementById('modal_item_modo').value = '';
 
       if (elPresets) elPresets.style.display = 'flex';
+      prepararExtrasModalLote_('', false); // AMVS-228
 
       if (eanPrefill) {
         elTitulo.innerHTML = '<i class="material-icons tiny">qr_code</i><span>Código ' + eanPrefill + ' não está na CMED</span>';
@@ -951,6 +1270,7 @@
       document.getElementById('modal_item_modo').value = '';
 
       if (elPresets) elPresets.style.display = 'none'; // Oculta presets ao editar item existente
+      prepararExtrasModalLote_('', false); // AMVS-228
       elTitulo.innerHTML = '<i class="material-icons tiny">edit</i><span>Editar Dados do Produto</span>';
 
       if (elOverlay) elOverlay.style.display = 'flex';
@@ -1024,6 +1344,12 @@
       var fab = (document.getElementById('modal_item_fab').value || '').trim();
       var val = (document.getElementById('modal_item_val').value || '').trim();
       var modo = document.getElementById('modal_item_modo').value;
+      // AMVS-228: "fixar este lote" — as próximas leituras do mesmo EAN somam aqui sem abrir a janela
+      var elFixar = document.getElementById('chkFixarLote');
+      if (modo === 'leitura' && elFixar && elFixar.checked && ean && lote) {
+        LOTE_FIXO = { ean: ean, lote: lote, validade: val, fabricacao: fab, produto: nome };
+        atualizarBarraLoteFixo_();
+      }
 
       if (!nome) {
         alert('Informe o nome do produto.');
