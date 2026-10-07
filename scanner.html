@@ -1194,7 +1194,10 @@
 
     // Diferença entre a lista na tela e (sala + pendentes): vira operações de soma
     function enviarDiferencasSala_() {
-      if (!SALA || SALA.encerrada || !SALA.recebeuEstado) return;
+      // AMVS-238: sem esperar o 1º estado da sala. Antes, o bipe feito enquanto o leitor ainda conectava
+      // (ou esperava o bilhete) não virava pendente e era apagado quando a lista da sala chegava. Em modo
+      // sala a lista começa vazia (não herda a do auto), então a diferença é só o que foi bipado aqui.
+      if (!SALA || SALA.encerrada) return;
       var local = {}, esperado = {};
       ITENS_ESCANEADOS.forEach(function(it) {
         var k = chaveSala_(it);
@@ -1232,7 +1235,9 @@
     function conectarSala_() {
       if (!SALA || SALA.encerrada) return;
       if (!(SESSAO_LEITOR && SESSAO_LEITOR.bilhete && /^https?:\/\//.test(SESSAO_LEITOR.workerUrl || ''))) {
-        SALA.estado = 'aguardando'; atualizarBarraSala_(); pedirSessaoAoSistema_(); return;
+        SALA.estado = 'aguardando'; atualizarBarraSala_(); pedirSessaoAoSistema_();
+        clearTimeout(SALA.timerRecon); SALA.timerRecon = setTimeout(conectarSala_, 4000); // AMVS-238
+        return;
       }
       var url = SESSAO_LEITOR.workerUrl.replace(/\/+$/, '').replace(/^http/, 'ws') + '/sala/ws?codigo=' + SALA.codigo +
         '&papel=leitor&bilhete=' + encodeURIComponent(SESSAO_LEITOR.bilhete);
@@ -1240,8 +1245,11 @@
       try { ws = new WebSocket(url); } catch (e) { agendarReconexaoSala_(); return; }
       SALA.ws = ws;
       SALA.estado = 'conectando';
-      ws.onopen = function() { SALA.estado = 'ok'; SALA.tent = 0; atualizarBarraSala_(); };
+      SALA.ultimaMsg = Date.now();
+      ws.onopen = function() { SALA.estado = 'ok'; SALA.tent = 0; SALA.ultimaMsg = Date.now(); atualizarBarraSala_(); };
       ws.onmessage = function(ev) {
+        if (SALA.ws !== ws) return;
+        SALA.ultimaMsg = Date.now(); // AMVS-238
         var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
         if (m.tipo === 'estado') {
           SALA.base = {};
@@ -1267,7 +1275,8 @@
         }
       };
       ws.onclose = function() {
-        if (SALA.ws === ws) SALA.ws = null;
+        if (SALA.ws !== ws) return; // AMVS-238: conexão antiga, já substituída
+        SALA.ws = null;
         if (SALA.encerrada) return;
         SALA.estado = 'reconectando'; atualizarBarraSala_();
         agendarReconexaoSala_();
@@ -1283,9 +1292,22 @@
     }
 
     // mantém a conexão viva no 4G e reconecta ao voltar para a aba
-    setInterval(function() { if (SALA && SALA.ws && SALA.ws.readyState === 1) { try { SALA.ws.send(JSON.stringify({ tipo: 'ping', t: Date.now() })); } catch (e) {} } }, 25000);
+    // AMVS-238: conexão que parou de responder (4G, tela apagada) é derrubada e refeita
+    function religarSala_() {
+      if (!SALA || SALA.encerrada) return;
+      var velho = SALA.ws; SALA.ws = null;
+      try { if (velho) velho.close(); } catch (e) {}
+      SALA.tent = 0; clearTimeout(SALA.timerRecon);
+      conectarSala_();
+    }
+    setInterval(function() {
+      if (!SALA || !SALA.ws || SALA.ws.readyState !== 1) return;
+      if (Date.now() - (SALA.ultimaMsg || 0) > 50000) { religarSala_(); return; }
+      try { SALA.ws.send(JSON.stringify({ tipo: 'ping', t: Date.now() })); } catch (e) {}
+    }, 20000);
     document.addEventListener('visibilitychange', function() {
-      if (SALA && !SALA.encerrada && document.visibilityState === 'visible' && (!SALA.ws || SALA.ws.readyState > 1)) { SALA.tent = 0; conectarSala_(); }
+      if (!SALA || SALA.encerrada || document.visibilityState !== 'visible') return;
+      if (!SALA.ws || SALA.ws.readyState > 1 || Date.now() - (SALA.ultimaMsg || 0) > 25000) religarSala_();
     });
 
     // ─── PROCESSAMENTO DO CÓDIGO DETECTADO ───
