@@ -484,7 +484,10 @@
     // ─── ESTADO DO SCANNER & BASE CMED ───
     var BASE_CMED = {};
     var ITENS_ESCANEADOS = [];
-    var CACHE_EAN_MANUAL = {}; // Memória para produtos de outros gêneros escaneados nesta sessão
+    // AMVS-241: produto fora da CMED (ou de outro gênero) digitado uma vez fica guardado NESTE aparelho;
+    // antes se perdia ao recarregar o leitor e o fiscal redigitava o nome a cada caixa
+    var CACHE_EAN_MANUAL = {};
+    try { CACHE_EAN_MANUAL = JSON.parse(localStorage.getItem('amvs_ean_manual') || '{}') || {}; } catch (eM) {}
     var MOTIVO_PADRAO_SCANNER = 'Comércio irregular';
     var ultimoCodigo = '';
     var debounceTimer = null;
@@ -1710,6 +1713,7 @@
         // Criando novo item
         if (ean && modo !== 'leitura') {
           CACHE_EAN_MANUAL[ean] = { produto: nome, marca: marca, volume: vol, motivo: motivo };
+          try { localStorage.setItem('amvs_ean_manual', JSON.stringify(CACHE_EAN_MANUAL)); } catch (eM) {} // AMVS-241
         }
         // AMVS-191: mesmo EAN + lote + fabricação + validade (em branco só casa com em branco) soma na linha
         var novoRastro = chaveRastro({ ean: ean, lote: lote, validade: val, fabricacao: fab });
